@@ -1,0 +1,309 @@
+#!/bin/bash
+# lakectl - start / stop / status for the services of the single-node ISIT312 data lake.
+#
+# Runs INSIDE the isit312-datalake container as user bigdata. lake.sh on the Mac calls it,
+# and it can be used directly in a container shell, e.g.:   lakectl status
+#
+# Every start-* command is idempotent (a daemon that is already running is left alone) and
+# returns only when the service really answers, or with a non-zero exit code after a timeout.
+set -u
+
+LOGS=/home/bigdata/logs
+mkdir -p "$LOGS"
+HOST=$(hostname)
+
+# A fixed string that appears in the command line of each daemon's JVM.
+M_NN='-Dproc_namenode'
+M_DN='-Dproc_datanode'
+M_RM='-Dproc_resourcemanager'
+M_NM='-Dproc_nodemanager'
+M_JHS='-Dproc_historyserver'
+M_HMS='org.apache.hadoop.hive.metastore.HiveMetaStore'
+M_HS2='org.apache.hive.service.server.HiveServer2'
+M_HZK='-Dproc_zookeeper'
+M_HM='-Dproc_master'
+M_HRS='-Dproc_regionserver'
+M_KZK='org.apache.zookeeper.server.quorum.QuorumPeerMain'
+M_KB=' kafka.Kafka '
+
+say()  { printf '[lakectl] %s\n' "$*"; }
+fail() { printf '[lakectl] ERROR: %s\n' "$*" >&2; return 1; }
+
+# PIDs of java processes whose full command line contains the given fixed string.
+# /proc is read directly because `pgrep -f` only looks at the first 4096 characters of a
+# command line, and Kafka's (a very long -cp list) is longer than that.
+java_pids() {
+  local marker=$1 d
+  for d in /proc/[0-9]*; do
+    [ "$(cat "$d/comm" 2>/dev/null)" = java ] || continue
+    if tr '\0' ' ' < "$d/cmdline" 2>/dev/null | grep -qF -- "$marker"; then
+      echo "${d#/proc/}"
+    fi
+  done
+}
+running() { [ -n "$(java_pids "$1")" ]; }
+
+# port_open <port> [host]  - true if something accepts TCP connections there.
+port_open() { (exec 3<>"/dev/tcp/${2:-127.0.0.1}/$1") >/dev/null 2>&1; }
+
+# wait_for <seconds> <description> <marker|-> <command...>
+# Polls the command once a second. If a marker is given and that JVM disappears while
+# waiting, gives up at once instead of sitting out the whole timeout.
+wait_for() {
+  local timeout=$1 what=$2 marker=$3; shift 3
+  local start=$SECONDS
+  until "$@" >/dev/null 2>&1; do
+    if [ "$marker" != "-" ] && ! running "$marker"; then
+      fail "$what: the process is not running any more (check the logs under $LOGS, \$HADOOP_HOME/logs, \$HBASE_HOME/logs)"
+      return 1
+    fi
+    if [ $((SECONDS - start)) -ge "$timeout" ]; then
+      fail "timed out after ${timeout}s waiting for: $what"
+      return 1
+    fi
+    sleep 1
+  done
+  say "ready: $what ($((SECONDS - start))s)"
+}
+
+# ensure <marker> <name> <start command...>  - start the daemon only if it is not running.
+ensure() {
+  local marker=$1 name=$2; shift 2
+  if running "$marker"; then
+    say "$name already running (pid $(java_pids "$marker" | tr '\n' ' '))"
+  else
+    say "starting $name"
+    "$@"
+  fi
+}
+
+# stop_pids <marker> <name> [seconds]  - SIGTERM, wait, SIGKILL as a last resort.
+stop_pids() {
+  local marker=$1 name=$2 timeout=${3:-60} start=$SECONDS pids
+  pids=$(java_pids "$marker" | tr '\n' ' ')
+  [ -n "$pids" ] || return 0
+  say "stopping $name (pid $pids)"
+  # shellcheck disable=SC2086
+  kill -TERM $pids 2>/dev/null
+  while running "$marker"; do
+    if [ $((SECONDS - start)) -ge "$timeout" ]; then
+      say "$name did not stop within ${timeout}s - sending SIGKILL"
+      # shellcheck disable=SC2046
+      kill -KILL $(java_pids "$marker") 2>/dev/null
+      sleep 1
+      break
+    fi
+    sleep 1
+  done
+}
+
+# ------------------------------------------------------------------ readiness probes
+jmx() { curl -s --max-time 5 "http://127.0.0.1:$1/jmx?qry=$2"; }
+datanode_live() {
+  local n
+  n=$(jmx 50070 'Hadoop:service=NameNode,name=FSNamesystemState' | sed -n 's/.*"NumLiveDataNodes" *: *\([0-9]*\).*/\1/p')
+  [ "${n:-0}" -ge 1 ]
+}
+nodemanager_active() {
+  local n
+  n=$(curl -s --max-time 5 http://127.0.0.1:8088/ws/v1/cluster/metrics | sed -n 's/.*"activeNodes":\([0-9]*\).*/\1/p')
+  [ "${n:-0}" -ge 1 ]
+}
+# The active master reports itself and at least one live region server over JMX.
+hbase_master_has_rs() {
+  local out
+  out=$(jmx 16010 'Hadoop:service=HBase,name=Master,sub=Server')
+  echo "$out" | grep -q '"tag.isActiveMaster" *: *"true"' || return 1
+  local n
+  n=$(echo "$out" | sed -n 's/.*"numRegionServers" *: *\([0-9]*\).*/\1/p')
+  [ "${n:-0}" -ge 1 ]
+}
+# The master has finished initialising: a real client request (list tables) succeeds.
+hbase_answers() { echo "list" | timeout 90 hbase shell -n; }
+kafka_answers() { timeout 30 kafka-broker-api-versions.sh --bootstrap-server localhost:9092; }
+
+# ------------------------------------------------------------------ core: HDFS, YARN, JHS
+start_core() {
+  say "== core: NameNode, DataNode, ResourceManager, NodeManager, JobHistoryServer =="
+  ensure "$M_NN"  NameNode          hadoop-daemon.sh start namenode
+  ensure "$M_DN"  DataNode          hadoop-daemon.sh start datanode
+  ensure "$M_RM"  ResourceManager   yarn-daemon.sh start resourcemanager
+  ensure "$M_NM"  NodeManager       yarn-daemon.sh start nodemanager
+  ensure "$M_JHS" JobHistoryServer  mr-jobhistory-daemon.sh start historyserver
+
+  wait_for 120 "NameNode RPC on 8020" "$M_NN" port_open 8020 || return 1
+  say "waiting for HDFS to leave safe mode"
+  timeout 300 hdfs dfsadmin -safemode wait || { fail "HDFS is still in safe mode after 300s"; return 1; }
+  wait_for 120 "DataNode registered with the NameNode" "$M_DN" datanode_live || return 1
+  wait_for 120 "ResourceManager web/REST on 8088" "$M_RM" port_open 8088 || return 1
+  wait_for 120 "NodeManager registered with the ResourceManager" "$M_NM" nodemanager_active || return 1
+  wait_for 120 "JobHistoryServer on 19888" "$M_JHS" port_open 19888 || return 1
+}
+
+stop_core() {
+  say "== stopping core =="
+  running "$M_JHS" && mr-jobhistory-daemon.sh stop historyserver
+  running "$M_NM"  && yarn-daemon.sh stop nodemanager
+  running "$M_RM"  && yarn-daemon.sh stop resourcemanager
+  running "$M_DN"  && hadoop-daemon.sh stop datanode
+  running "$M_NN"  && hadoop-daemon.sh stop namenode
+  # Fallback if a pid file was lost and the daemon script could not find the process.
+  stop_pids "$M_JHS" JobHistoryServer 30
+  stop_pids "$M_NM"  NodeManager 30
+  stop_pids "$M_RM"  ResourceManager 30
+  stop_pids "$M_DN"  DataNode 30
+  stop_pids "$M_NN"  NameNode 30
+  return 0
+}
+
+# ------------------------------------------------------------------ Hive
+# Both services run in the background with stdout/stderr in $LOGS (Hive's own log4j file is
+# /tmp/bigdata/hive.log).
+# Heap: the JVM takes the LAST -Xmx on its command line. Hive's launcher passes -Xmx256m
+# (HADOOP_HEAPSIZE) and hadoop-env.sh then adds "-Xmx512m $HADOOP_CLIENT_OPTS" after it, so
+# only an -Xmx inside HADOOP_CLIENT_OPTS ends up last and actually takes effect.
+launch_metastore() {
+  ( cd "$LOGS" && echo "---- $(date '+%F %T') starting metastore ----" >> hive-metastore.log \
+    && HADOOP_CLIENT_OPTS="-Xmx512m" nohup hive --service metastore >> hive-metastore.log 2>&1 < /dev/null & )
+}
+launch_hiveserver2() {
+  ( cd "$LOGS" && echo "---- $(date '+%F %T') starting hiveserver2 ----" >> hiveserver2.log \
+    && HADOOP_CLIENT_OPTS="-Xmx1024m" nohup hive --service hiveserver2 >> hiveserver2.log 2>&1 < /dev/null & )
+}
+
+start_hive() {
+  say "== Hive: metastore (9083) + HiveServer2 (10000) =="
+  port_open 8020 || { fail "HDFS is not up (NameNode port 8020 is closed) - run start-core first"; return 1; }
+  ensure "$M_HMS" "Hive metastore" launch_metastore
+  sleep 2
+  wait_for 180 "Hive metastore on 9083 (log: $LOGS/hive-metastore.log)" "$M_HMS" port_open 9083 || return 1
+  ensure "$M_HS2" "HiveServer2" launch_hiveserver2
+  sleep 2
+  wait_for 300 "HiveServer2 on 10000 (log: $LOGS/hiveserver2.log)" "$M_HS2" port_open 10000 || return 1
+}
+
+stop_hive() {
+  say "== stopping Hive =="
+  stop_pids "$M_HS2" HiveServer2 60
+  stop_pids "$M_HMS" "Hive metastore" 60
+  return 0
+}
+
+# ------------------------------------------------------------------ HBase
+start_hbase() {
+  say "== HBase: ZooKeeper (2181), HMaster, HRegionServer =="
+  port_open 8020 || { fail "HDFS is not up (NameNode port 8020 is closed) - run start-core first"; return 1; }
+  # start-hbase.sh reaches its ZooKeeper and region server over ssh to localhost.
+  if ! pgrep -x sshd >/dev/null 2>&1; then
+    say "starting sshd"
+    sudo -n /usr/sbin/sshd || { fail "could not start sshd"; return 1; }
+  fi
+  if running "$M_HZK" && running "$M_HM" && running "$M_HRS"; then
+    say "HBase already running"
+  else
+    say "starting HBase"
+    start-hbase.sh
+  fi
+  wait_for 120 "HBase ZooKeeper on 2181" "$M_HZK" port_open 2181 || return 1
+  wait_for 180 "HBase Master UI on 16010" "$M_HM" port_open 16010 || return 1
+  wait_for 240 "HMaster active with a live region server" "$M_HM" hbase_master_has_rs || return 1
+  wait_for 300 "HBase answers client requests (list)" "$M_HM" hbase_answers || return 1
+}
+
+stop_hbase() {
+  say "== stopping HBase =="
+  if running "$M_HM"; then
+    timeout 180 stop-hbase.sh || say "stop-hbase.sh did not finish cleanly - stopping the processes directly"
+  fi
+  stop_pids "$M_HRS" HRegionServer 60
+  stop_pids "$M_HM"  HMaster 30
+  stop_pids "$M_HZK" "HBase ZooKeeper" 30
+  return 0
+}
+
+# ------------------------------------------------------------------ Kafka
+# Kafka has its own ZooKeeper on 2182 (config/zookeeper.properties); HBase keeps 2181.
+start_kafka() {
+  say "== Kafka: ZooKeeper (2182) + broker (9092) =="
+  export LOG_DIR="$LOGS/kafka"
+  mkdir -p "$LOG_DIR"
+  ensure "$M_KZK" "Kafka ZooKeeper" env KAFKA_HEAP_OPTS="-Xms128m -Xmx256m" \
+    zookeeper-server-start.sh -daemon "$KAFKA_HOME/config/zookeeper.properties"
+  sleep 1
+  wait_for 90 "Kafka ZooKeeper on 2182 (log: $LOG_DIR/zookeeper.out)" "$M_KZK" port_open 2182 || return 1
+  ensure "$M_KB" "Kafka broker" env KAFKA_HEAP_OPTS="-Xms256m -Xmx768m" \
+    kafka-server-start.sh -daemon "$KAFKA_HOME/config/server.properties"
+  sleep 2
+  wait_for 120 "Kafka broker on 9092 (log: $LOG_DIR/kafkaServer.out)" "$M_KB" port_open 9092 || return 1
+  wait_for 120 "Kafka broker answers API requests" "$M_KB" kafka_answers || return 1
+}
+
+stop_kafka() {
+  say "== stopping Kafka =="
+  stop_pids "$M_KB"  "Kafka broker" 90
+  stop_pids "$M_KZK" "Kafka ZooKeeper" 30
+  return 0
+}
+
+# ------------------------------------------------------------------ status
+ALL_UP=1
+row() {  # row <service> <marker> <port> [host]
+  local name=$1 marker=$2 port=$3 host=${4:-127.0.0.1} pids pstate
+  pids=$(java_pids "$marker" | tr '\n' ' ')
+  if port_open "$port" "$host"; then pstate=open; else pstate=CLOSED; fi
+  if [ -z "$pids" ] || [ "$pstate" = CLOSED ]; then ALL_UP=0; fi
+  printf '  %-26s %-10s %-7s %s\n' "$name" "${pids:-DOWN}" "$port" "$pstate"
+}
+
+status() {
+  echo "== java processes (jps) =="
+  jps 2>/dev/null | grep -v ' Jps$' | sort -k2
+  echo
+  echo "== services =="
+  printf '  %-26s %-10s %-7s %s\n' SERVICE PID PORT STATE
+  row "NameNode (RPC)"           "$M_NN"  8020
+  row "NameNode (web UI)"        "$M_NN"  50070
+  row "DataNode (web UI)"        "$M_DN"  50075
+  row "ResourceManager (UI)"     "$M_RM"  8088
+  row "NodeManager (UI)"         "$M_NM"  8042
+  row "JobHistoryServer (UI)"    "$M_JHS" 19888
+  row "Hive metastore"           "$M_HMS" 9083
+  row "HiveServer2 (JDBC)"       "$M_HS2" 10000
+  row "HiveServer2 (web UI)"     "$M_HS2" 10002
+  row "HBase ZooKeeper"          "$M_HZK" 2181
+  row "HBase Master (RPC)"       "$M_HM"  16000 "$HOST"
+  row "HBase Master (web UI)"    "$M_HM"  16010
+  # start-hbase.sh runs a localhost-only region server on 16201/16301, not HBase's usual 16020/16030.
+  row "HBase RegionServer (RPC)" "$M_HRS" 16201 "$HOST"
+  row "Kafka ZooKeeper"          "$M_KZK" 2182
+  row "Kafka broker"             "$M_KB"  9092
+  echo
+  if port_open 8020; then
+    echo "  HDFS: $(timeout 30 hdfs dfsadmin -safemode get 2>/dev/null | head -1), live datanodes: $(jmx 50070 'Hadoop:service=NameNode,name=FSNamesystemState' | sed -n 's/.*"NumLiveDataNodes" *: *\([0-9]*\).*/\1/p')"
+  fi
+  if port_open 8088; then
+    echo "  YARN: active nodes: $(curl -s --max-time 5 http://127.0.0.1:8088/ws/v1/cluster/metrics | sed -n 's/.*"activeNodes":\([0-9]*\).*/\1/p'), memory MB total/allocated: $(curl -s --max-time 5 http://127.0.0.1:8088/ws/v1/cluster/metrics | sed -n 's/.*"totalMB":\([0-9]*\).*/\1/p')/$(curl -s --max-time 5 http://127.0.0.1:8088/ws/v1/cluster/metrics | sed -n 's/.*"allocatedMB":\([0-9]*\).*/\1/p')"
+  fi
+  echo
+  if [ "$ALL_UP" = 1 ]; then echo "  RESULT: all services are up"; return 0; fi
+  echo "  RESULT: NOT all services are up"
+  return 1
+}
+
+# ------------------------------------------------------------------ main
+case "${1:-}" in
+  start-core)  start_core ;;
+  start-hive)  start_hive ;;
+  start-hbase) start_hbase ;;
+  start-kafka) start_kafka ;;
+  start-all)   start_core && start_hive && start_hbase && start_kafka && say "all services started" ;;
+  stop-core)   stop_core ;;
+  stop-hive)   stop_hive ;;
+  stop-hbase)  stop_hbase ;;
+  stop-kafka)  stop_kafka ;;
+  stop-all)    stop_kafka; stop_hbase; stop_hive; stop_core; say "all services stopped" ;;
+  status)      status ;;
+  *)
+    echo "usage: lakectl {start-core|start-hive|start-hbase|start-kafka|start-all|stop-core|stop-hive|stop-hbase|stop-kafka|stop-all|status}" >&2
+    exit 2 ;;
+esac
