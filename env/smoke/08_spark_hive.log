@@ -1,0 +1,387 @@
+# run from the Mac with: ./lake.sh exec 'bash /home/bigdata/project/env/smoke/scripts/08_spark_hive.sh'
+==============================================================================
+SMOKE TEST: 08_spark_hive
+started:    2026-11-16 19:38:14 UTC   host: datalake   user: bigdata
+==============================================================================
+
+$ hdfs dfs -rm -r -f -skipTrash /user/bigdata/smoke_spark; hdfs dfs -mkdir -p /user/bigdata/smoke_spark/dept
+26/11/16 19:38:14 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/16 19:38:15 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+
+$ printf 'id,dept,salary\n1,eng,100\n2,eng,150\n3,ops,80\n4,ops,70\n5,hr,60\n' > /tmp/smoke_emp.csv && hdfs dfs -put -f /tmp/smoke_emp.csv /user/bigdata/smoke_spark/emp.csv
+26/11/16 19:38:15 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+
+$ printf 'eng,Dubai\nops,Sydney\nhr,Wollongong\n' > /tmp/smoke_dept.csv && hdfs dfs -put -f /tmp/smoke_dept.csv /user/bigdata/smoke_spark/dept/dept.csv
+26/11/16 19:38:16 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+[PASS] test data uploaded
+
+--- a Hive table created in Beeline
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e "DROP TABLE IF EXISTS smoke_beeline_dept; DROP TABLE IF EXISTS smoke_spark_agg_local; DROP TABLE IF EXISTS smoke_spark_agg_yarn; CREATE EXTERNAL TABLE smoke_beeline_dept (dept STRING, location STRING) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LOCATION '/user/bigdata/smoke_spark/dept'; SELECT * FROM smoke_beeline_dept;"
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+No rows affected (0.018 seconds)
+No rows affected (0.005 seconds)
+No rows affected (0.005 seconds)
+No rows affected (0.038 seconds)
++--------------------------+------------------------------+
+| smoke_beeline_dept.dept  | smoke_beeline_dept.location  |
++--------------------------+------------------------------+
+| eng                      | Dubai                        |
+| ops                      | Sydney                       |
+| hr                       | Wollongong                   |
++--------------------------+------------------------------+
+3 rows selected (0.146 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] beeline exit code 0
+[PASS] Beeline sees its own table
+
+$ cat /home/bigdata/project/env/smoke/scripts/08_spark_hive.scala
+// 08 - Spark SQL <-> Hive metastore. Run with:  spark-shell --master <local[*]|yarn> -i 08_spark_hive.scala
+// SMOKE_SUFFIX (environment) keeps the local and the YARN run's tables apart.
+import org.apache.spark.sql.functions._
+
+val suffix = sys.env.getOrElse("SMOKE_SUFFIX", "local")
+val target = "smoke_spark_agg_" + suffix
+println(s"### spark=${spark.version} scala=${util.Properties.versionNumberString} master=${sc.master}")
+println("### catalog=" + spark.conf.get("spark.sql.catalogImplementation") +
+        " hive.metastore.version=" + spark.conf.get("spark.sql.hive.metastore.version") +
+        " defaultFS=" + sc.hadoopConfiguration.get("fs.defaultFS"))
+
+// 1. CSV from HDFS -> DataFrame (relative path = /user/bigdata/... on HDFS)
+val emp = spark.read.option("header", "true").option("inferSchema", "true").csv("smoke_spark/emp.csv")
+emp.printSchema()
+emp.show()
+
+// 2. aggregate
+val agg = emp.groupBy("dept").agg(count("*").as("n"), sum("salary").as("total_salary"), avg("salary").as("avg_salary")).orderBy("dept")
+agg.show()
+
+// 3. save as a Hive table (managed, Parquet) - visible in Beeline afterwards
+agg.write.mode("overwrite").saveAsTable(target)
+spark.sql("SHOW TABLES LIKE 'smoke_*'").show(false)
+
+// 4. read a table that was created in Beeline
+val dept = spark.table("smoke_beeline_dept")
+dept.show()
+spark.sql(s"SELECT a.dept, a.n, a.total_salary, d.location FROM $target a JOIN smoke_beeline_dept d ON a.dept = d.dept ORDER BY a.dept").show()
+
+println("### SMOKE08 rows_written=" + spark.table(target).count + " dept_rows=" + dept.count + " suffix=" + suffix)
+System.exit(0)
+
+--- spark-shell --master 'local[*]'
+
+$ SMOKE_SUFFIX=local spark-shell --master 'local[*]' -i /home/bigdata/project/env/smoke/scripts/08_spark_hive.scala
+26/11/16 19:38:18 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = local[*], app id = local-1794857900864).
+Spark session available as 'spark'.
+### spark=2.4.8 scala=2.11.12 master=local[*]
+### catalog=hive hive.metastore.version=2.3.3 defaultFS=hdfs://localhost:8020
+root
+ |-- id: integer (nullable = true)
+ |-- dept: string (nullable = true)
+ |-- salary: integer (nullable = true)
+
++---+----+------+
+| id|dept|salary|
++---+----+------+
+|  1| eng|   100|
+|  2| eng|   150|
+|  3| ops|    80|
+|  4| ops|    70|
+|  5|  hr|    60|
++---+----+------+
+
++----+---+------------+----------+
+|dept|  n|total_salary|avg_salary|
++----+---+------------+----------+
+| eng|  2|         250|     125.0|
+|  hr|  1|          60|      60.0|
+| ops|  2|         150|      75.0|
++----+---+------------+----------+
+
+26/11/16 19:38:24 WARN session.SessionState: METASTORE_FILTER_HOOK will be ignored, since hive.security.authorization.manager is set to instance of HiveAuthorizerFactory.
++--------+---------------------+-----------+
+|database|tableName            |isTemporary|
++--------+---------------------+-----------+
+|default |smoke_beeline_dept   |false      |
+|default |smoke_spark_agg_local|false      |
++--------+---------------------+-----------+
+
++----+----------+
+|dept|  location|
++----+----------+
+| eng|     Dubai|
+| ops|    Sydney|
+|  hr|Wollongong|
++----+----------+
+
++----+---+------------+----------+
+|dept|  n|total_salary|  location|
++----+---+------------+----------+
+| eng|  2|         250|     Dubai|
+|  hr|  1|          60|Wollongong|
+| ops|  2|         150|    Sydney|
++----+---+------------+----------+
+
+### SMOKE08 rows_written=3 dept_rows=3 suffix=local
+[PASS] spark-shell (local) exit code 0
+[PASS] no Scala/Spark error in the shell output (local)
+[PASS] running on the requested master (local)
+[PASS] Hive catalog in use, metastore client 2.3.3 (local)
+[PASS] aggregate computed in Spark (local)
+[PASS] Spark reads the Beeline-created table (local)
+[PASS] saveAsTable wrote 3 rows (local)
+
+--- the Spark-written table read from Beeline (local)
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e "SHOW TABLES LIKE 'smoke_*'; SELECT * FROM smoke_spark_agg_local ORDER BY dept; SELECT COUNT(*) AS n, SUM(total_salary) AS total FROM smoke_spark_agg_local;"
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
++------------------------+
+|        tab_name        |
++------------------------+
+| smoke_beeline_dept     |
+| smoke_spark_agg_local  |
++------------------------+
+2 rows selected (0.036 seconds)
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++-----------------------------+--------------------------+-------------------------------------+-----------------------------------+
+| smoke_spark_agg_local.dept  | smoke_spark_agg_local.n  | smoke_spark_agg_local.total_salary  | smoke_spark_agg_local.avg_salary  |
++-----------------------------+--------------------------+-------------------------------------+-----------------------------------+
+| eng                         | 2                        | 250                                 | 125.0                             |
+| hr                          | 1                        | 60                                  | 60.0                              |
+| ops                         | 2                        | 150                                 | 75.0                              |
++-----------------------------+--------------------------+-------------------------------------+-----------------------------------+
+3 rows selected (11.37 seconds)
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++----+--------+
+| n  | total  |
++----+--------+
+| 3  | 460    |
++----+--------+
+1 row selected (13.822 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] beeline exit code 0 (local)
+[PASS] no HiveServer2 error (local)
+[PASS] Beeline lists the Spark table (local)
+[PASS] Beeline reads Spark's Parquet rows (local)
+[PASS] Hive-on-MapReduce aggregates Spark's table (local)
+
+--- spark-shell --master yarn
+
+$ SMOKE_SUFFIX=yarn spark-shell --master yarn -i /home/bigdata/project/env/smoke/scripts/08_spark_hive.scala
+26/11/16 19:38:52 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = yarn, app id = application_1794857713160_0009).
+Spark session available as 'spark'.
+### spark=2.4.8 scala=2.11.12 master=yarn
+### catalog=hive hive.metastore.version=2.3.3 defaultFS=hdfs://localhost:8020
+[Stage 0:>                                                          (0 + 1) / 1]                                                                                root
+ |-- id: integer (nullable = true)
+ |-- dept: string (nullable = true)
+ |-- salary: integer (nullable = true)
+
++---+----+------+
+| id|dept|salary|
++---+----+------+
+|  1| eng|   100|
+|  2| eng|   150|
+|  3| ops|    80|
+|  4| ops|    70|
+|  5|  hr|    60|
++---+----+------+
+
++----+---+------------+----------+
+|dept|  n|total_salary|avg_salary|
++----+---+------------+----------+
+| eng|  2|         250|     125.0|
+|  hr|  1|          60|      60.0|
+| ops|  2|         150|      75.0|
++----+---+------------+----------+
+
+[Stage 9:=======================================>                   (2 + 1) / 3]                                                                                26/11/16 19:39:03 WARN session.SessionState: METASTORE_FILTER_HOOK will be ignored, since hive.security.authorization.manager is set to instance of HiveAuthorizerFactory.
++--------+---------------------+-----------+
+|database|tableName            |isTemporary|
++--------+---------------------+-----------+
+|default |smoke_beeline_dept   |false      |
+|default |smoke_spark_agg_local|false      |
+|default |smoke_spark_agg_yarn |false      |
++--------+---------------------+-----------+
+
++----+----------+
+|dept|  location|
++----+----------+
+| eng|     Dubai|
+| ops|    Sydney|
+|  hr|Wollongong|
++----+----------+
+
++----+---+------------+----------+
+|dept|  n|total_salary|  location|
++----+---+------------+----------+
+| eng|  2|         250|     Dubai|
+|  hr|  1|          60|Wollongong|
+| ops|  2|         150|    Sydney|
++----+---+------------+----------+
+
+### SMOKE08 rows_written=3 dept_rows=3 suffix=yarn
+[PASS] spark-shell (yarn) exit code 0
+[PASS] no Scala/Spark error in the shell output (yarn)
+[PASS] running on the requested master (yarn)
+[PASS] Hive catalog in use, metastore client 2.3.3 (yarn)
+[PASS] aggregate computed in Spark (yarn)
+[PASS] Spark reads the Beeline-created table (yarn)
+[PASS] saveAsTable wrote 3 rows (yarn)
+
+--- the Spark-written table read from Beeline (yarn)
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e "SHOW TABLES LIKE 'smoke_*'; SELECT * FROM smoke_spark_agg_yarn ORDER BY dept; SELECT COUNT(*) AS n, SUM(total_salary) AS total FROM smoke_spark_agg_yarn;"
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
++------------------------+
+|        tab_name        |
++------------------------+
+| smoke_beeline_dept     |
+| smoke_spark_agg_local  |
+| smoke_spark_agg_yarn   |
++------------------------+
+3 rows selected (0.032 seconds)
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++----------------------------+-------------------------+------------------------------------+----------------------------------+
+| smoke_spark_agg_yarn.dept  | smoke_spark_agg_yarn.n  | smoke_spark_agg_yarn.total_salary  | smoke_spark_agg_yarn.avg_salary  |
++----------------------------+-------------------------+------------------------------------+----------------------------------+
+| eng                        | 2                       | 250                                | 125.0                            |
+| hr                         | 1                       | 60                                 | 60.0                             |
+| ops                        | 2                       | 150                                | 75.0                             |
++----------------------------+-------------------------+------------------------------------+----------------------------------+
+3 rows selected (12.8 seconds)
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++----+--------+
+| n  | total  |
++----+--------+
+| 3  | 460    |
++----+--------+
+1 row selected (11.46 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] beeline exit code 0 (yarn)
+[PASS] no HiveServer2 error (yarn)
+[PASS] Beeline lists the Spark table (yarn)
+[PASS] Beeline reads Spark's Parquet rows (yarn)
+[PASS] Hive-on-MapReduce aggregates Spark's table (yarn)
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e "DESCRIBE FORMATTED smoke_spark_agg_local;"
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
++-------------------------------+----------------------------------------------------+----------------------------------------------------+
+|           col_name            |                     data_type                      |                      comment                       |
++-------------------------------+----------------------------------------------------+----------------------------------------------------+
+| # col_name                    | data_type                                          | comment                                            |
+|                               | NULL                                               | NULL                                               |
+| dept                          | string                                             |                                                    |
+| n                             | bigint                                             |                                                    |
+| total_salary                  | bigint                                             |                                                    |
+| avg_salary                    | double                                             |                                                    |
+|                               | NULL                                               | NULL                                               |
+| # Detailed Table Information  | NULL                                               | NULL                                               |
+| Database:                     | default                                            | NULL                                               |
+| Owner:                        | bigdata                                            | NULL                                               |
+| CreateTime:                   | Mon Nov 16 19:38:24 UTC 2026                       | NULL                                               |
+| LastAccessTime:               | UNKNOWN                                            | NULL                                               |
+| Retention:                    | 0                                                  | NULL                                               |
+| Location:                     | hdfs://localhost:8020/user/hive/warehouse/smoke_spark_agg_local | NULL                                               |
+| Table Type:                   | MANAGED_TABLE                                      | NULL                                               |
+| Table Parameters:             | NULL                                               | NULL                                               |
+|                               | numFiles                                           | 3                                                  |
+|                               | spark.sql.create.version                           | 2.4.8                                              |
+|                               | spark.sql.sources.provider                         | parquet                                            |
+|                               | spark.sql.sources.schema.numParts                  | 1                                                  |
+|                               | spark.sql.sources.schema.part.0                    | {\"type\":\"struct\",\"fields\":[{\"name\":\"dept\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"n\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}},{\"name\":\"total_salary\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}},{\"name\":\"avg_salary\",\"type\":\"double\",\"nullable\":true,\"metadata\":{}}]} |
+|                               | totalSize                                          | 3498                                               |
+|                               | transient_lastDdlTime                              | 1794857904                                         |
+|                               | NULL                                               | NULL                                               |
+| # Storage Information         | NULL                                               | NULL                                               |
+| SerDe Library:                | org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe | NULL                                               |
+| InputFormat:                  | org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat | NULL                                               |
+| OutputFormat:                 | org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat | NULL                                               |
+| Compressed:                   | No                                                 | NULL                                               |
+| Num Buckets:                  | -1                                                 | NULL                                               |
+| Bucket Columns:               | []                                                 | NULL                                               |
+| Sort Columns:                 | []                                                 | NULL                                               |
+| Storage Desc Params:          | NULL                                               | NULL                                               |
+|                               | path                                               | hdfs://localhost:8020/user/hive/warehouse/smoke_spark_agg_local |
+|                               | serialization.format                               | 1                                                  |
++-------------------------------+----------------------------------------------------+----------------------------------------------------+
+35 rows selected (0.067 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] table is stored as Parquet in the Hive warehouse on HDFS
+
+--- clean up
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e "DROP TABLE smoke_spark_agg_local; DROP TABLE smoke_spark_agg_yarn; DROP TABLE smoke_beeline_dept; SHOW TABLES;"
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+No rows affected (0.033 seconds)
+No rows affected (0.107 seconds)
+No rows affected (0.121 seconds)
++-----------+
+| tab_name  |
++-----------+
++-----------+
+No rows selected (0.024 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] tables dropped
+
+$ hdfs dfs -rm -r -skipTrash /user/bigdata/smoke_spark
+26/11/16 19:39:33 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Deleted /user/bigdata/smoke_spark
+[PASS] HDFS folder removed
+
+finished:   2026-11-16 19:39:33 UTC
+RESULT: PASS (08_spark_hive)
+[test script exit code 0]

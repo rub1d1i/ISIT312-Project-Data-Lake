@@ -1,0 +1,350 @@
+# run from the Mac with: ./lake.sh exec 'bash /home/bigdata/project/env/smoke/scripts/10_spark_hbase.sh'
+==============================================================================
+SMOKE TEST: 10_spark_hbase
+started:    2026-11-16 19:47:14 UTC   host: datalake   user: bigdata
+==============================================================================
+
+$ grep -E '^spark\.(driver|executor)\.extraClassPath' $SPARK_HOME/conf/spark-defaults.conf | tr ':' '\n'
+spark.driver.extraClassPath         /usr/share/spark/hbase-conf
+/usr/share/hbase/lib/hbase-client-1.2.6.jar
+/usr/share/hbase/lib/hbase-common-1.2.6.jar
+/usr/share/hbase/lib/hbase-protocol-1.2.6.jar
+/usr/share/hbase/lib/hbase-server-1.2.6.jar
+/usr/share/hbase/lib/hbase-hadoop-compat-1.2.6.jar
+/usr/share/hbase/lib/hbase-hadoop2-compat-1.2.6.jar
+/usr/share/hbase/lib/metrics-core-2.2.0.jar
+spark.executor.extraClassPath       /usr/share/spark/hbase-conf
+/usr/share/hbase/lib/hbase-client-1.2.6.jar
+/usr/share/hbase/lib/hbase-common-1.2.6.jar
+/usr/share/hbase/lib/hbase-protocol-1.2.6.jar
+/usr/share/hbase/lib/hbase-server-1.2.6.jar
+/usr/share/hbase/lib/hbase-hadoop-compat-1.2.6.jar
+/usr/share/hbase/lib/hbase-hadoop2-compat-1.2.6.jar
+/usr/share/hbase/lib/metrics-core-2.2.0.jar
+
+$ echo "create 'smoke_spark_hb', 'cf'" | hbase shell -n
+2026-11-16 19:47:22,866 WARN  [main] util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hbase/lib/slf4j-log4j12-1.7.5.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.slf4j.impl.Log4jLoggerFactory]
+0 row(s) in 1.2770 seconds
+
+Hbase::Table - smoke_spark_hb
+[PASS] HBase table created
+
+=== (a) batch: foreachPartition on YARN
+
+$ cat /home/bigdata/project/env/smoke/scripts/10a_hbase_batch.scala
+// 10a - batch write Spark -> HBase with the HBase client API inside foreachPartition.
+// Run with:  spark-shell --master yarn -i 10a_hbase_batch.scala      (or --master 'local[*]')
+// No --jars needed: the HBase client jars are on the driver/executor classpath (spark-defaults.conf).
+import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
+import org.apache.hadoop.hbase.client.{ConnectionFactory, Put}
+import org.apache.hadoop.hbase.util.Bytes
+
+println(s"### master=${sc.master}")
+val people = Seq(("b1", "alice", "Dubai"), ("b2", "bob", "Sydney"), ("b3", "carol", "Wollongong"), ("b4", "dave", "Dubai")).
+  toDF("rowkey", "name", "city").repartition(2)
+
+// One HBase connection per partition (connections are not serializable, so they are created
+// on the executor, inside the function), one Put per row.
+people.rdd.foreachPartition { rows =>
+  val conn  = ConnectionFactory.createConnection(HBaseConfiguration.create())   // reads hbase-site.xml
+  val table = conn.getTable(TableName.valueOf("smoke_spark_hb"))
+  try {
+    rows.foreach { r =>
+      val put = new Put(Bytes.toBytes(r.getString(0)))
+      put.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("name"), Bytes.toBytes(r.getString(1)))
+      put.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("city"), Bytes.toBytes(r.getString(2)))
+      table.put(put)
+    }
+  } finally { table.close(); conn.close() }
+}
+println("### SMOKE10A batch rows sent to HBase: " + people.count)
+System.exit(0)
+
+$ spark-shell --master yarn -i /home/bigdata/project/env/smoke/scripts/10a_hbase_batch.scala
+26/11/16 19:47:25 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = yarn, app id = application_1794857713160_0018).
+Spark session available as 'spark'.
+### master=yarn
+[Stage 1:>                                                          (0 + 2) / 2]                                                                                ### SMOKE10A batch rows sent to HBase: 4
+[PASS] spark-shell exit code 0
+[PASS] no Scala/Spark error in the shell output
+[PASS] ran on YARN
+[PASS] 4 rows sent
+
+=== (b) streaming: Kafka -> foreachBatch -> HBase
+
+$ kafka-topics.sh --bootstrap-server localhost:9092 --create --topic smoke_hb_stream --partitions 3 --replication-factor 1
+WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.
+Created topic smoke_hb_stream.
+[PASS] topic created
+
+$ printf 's1,erin,Sydney\ns2,frank,Dubai\n' | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic smoke_hb_stream
+[PASS] first messages produced
+
+$ cat /home/bigdata/project/env/smoke/scripts/10b_hbase_stream.scala
+// 10b - streaming write Kafka -> Spark Structured Streaming -> HBase with foreachBatch.
+// Kafka values are CSV lines:  rowkey,name,city
+// Run with:  spark-shell --master 'local[*]' -i 10b_hbase_stream.scala
+import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
+import org.apache.hadoop.hbase.client.{ConnectionFactory, Put}
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.streaming.Trigger
+
+// The HBase write, kept in a serializable object so it can be shipped to executors.
+object HBaseSink extends Serializable {
+  def writePartition(rows: Iterator[Row]): Unit = {
+    val conn  = ConnectionFactory.createConnection(HBaseConfiguration.create())
+    val table = conn.getTable(TableName.valueOf("smoke_spark_hb"))
+    try {
+      rows.foreach { r =>
+        val put = new Put(Bytes.toBytes(r.getAs[String]("rowkey")))
+        put.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("name"), Bytes.toBytes(r.getAs[String]("name")))
+        put.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("city"), Bytes.toBytes(r.getAs[String]("city")))
+        table.put(put)
+      }
+    } finally { table.close(); conn.close() }
+  }
+}
+
+val raw = spark.readStream.format("kafka").
+  option("kafka.bootstrap.servers", "localhost:9092").
+  option("subscribe", "smoke_hb_stream").
+  option("startingOffsets", "earliest").
+  load()
+
+// parse the CSV value into columns
+val parsed = raw.selectExpr("CAST(value AS STRING) AS line").
+  select(split($"line", ",").as("f")).
+  select($"f".getItem(0).as("rowkey"), $"f".getItem(1).as("name"), $"f".getItem(2).as("city")).
+  filter($"rowkey".isNotNull && $"name".isNotNull && $"city".isNotNull)
+
+val q = parsed.writeStream.queryName("smoke_hbase").
+  foreachBatch { (batch: DataFrame, batchId: Long) =>
+    batch.persist()
+    val n = batch.count()
+    batch.rdd.foreachPartition(HBaseSink.writePartition _)
+    println(s"### SMOKE10B batch $batchId: $n row(s) written to HBase")
+    batch.unpersist()
+  }.
+  option("checkpointLocation", "hdfs://localhost:8020/user/bigdata/smoke_hb_stream/chk").
+  trigger(Trigger.ProcessingTime("5 seconds")).start()
+
+println("### STREAM STARTED: " + q.name)
+q.awaitTermination(40000)
+q.stop()
+println("### active streams after stop: " + spark.streams.active.length)
+System.exit(0)
+
+$ spark-shell --master 'local[*]' -i /home/bigdata/project/env/smoke/scripts/10b_hbase_stream.scala > /tmp/smoke10_spark.out 2>&1 &
+[PASS] streaming query started (after 6s)
+
+$ printf 's3,gina,Wollongong\n' | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic smoke_hb_stream
+[PASS] second message produced while the query runs
+
+$ cat /tmp/smoke10_spark.out
+26/11/16 19:47:38 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = local[*], app id = local-1794858460373).
+Spark session available as 'spark'.
+### STREAM STARTED: smoke_hbase
+[Stage 0:>                                                          (0 + 1) / 1][Stage 0:===========================================================(1 + 0) / 1]                                                                                ### SMOKE10B batch 0: 2 row(s) written to HBase
+### SMOKE10B batch 1: 1 row(s) written to HBase
+### active streams after stop: 0
+[PASS] spark-shell exit code 0
+[PASS] no Scala/Spark error in the shell output
+[PASS] first micro-batch wrote 2 rows
+[PASS] a later micro-batch wrote 1 row
+[PASS] query stopped cleanly
+
+=== HBase shell: confirm what Spark wrote
+
+$ hbase shell -n <<'HB'
+get 'smoke_spark_hb', 'b1'
+get 'smoke_spark_hb', 's3'
+scan 'smoke_spark_hb'
+count 'smoke_spark_hb'
+HB
+2026-11-16 19:48:23,179 WARN  [main] util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hbase/lib/slf4j-log4j12-1.7.5.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.slf4j.impl.Log4jLoggerFactory]
+COLUMN                CELL                                                      
+ cf:city              timestamp=1794858455617, value=Dubai                      
+ cf:name              timestamp=1794858455617, value=alice                      
+2 row(s) in 0.0800 seconds
+
+nil
+COLUMN                CELL                                                      
+ cf:city              timestamp=1794858476069, value=Wollongong                 
+ cf:name              timestamp=1794858476069, value=gina                       
+2 row(s) in 0.0030 seconds
+
+nil
+ROW                   COLUMN+CELL                                               
+ b1                   column=cf:city, timestamp=1794858455617, value=Dubai      
+ b1                   column=cf:name, timestamp=1794858455617, value=alice      
+ b2                   column=cf:city, timestamp=1794858455638, value=Sydney     
+ b2                   column=cf:name, timestamp=1794858455638, value=bob        
+ b3                   column=cf:city, timestamp=1794858455622, value=Wollongong 
+ b3                   column=cf:name, timestamp=1794858455622, value=carol      
+ b4                   column=cf:city, timestamp=1794858455634, value=Dubai      
+ b4                   column=cf:name, timestamp=1794858455634, value=dave       
+ s1                   column=cf:city, timestamp=1794858464242, value=Sydney     
+ s1                   column=cf:name, timestamp=1794858464242, value=erin       
+ s2                   column=cf:city, timestamp=1794858464247, value=Dubai      
+ s2                   column=cf:name, timestamp=1794858464247, value=frank      
+ s3                   column=cf:city, timestamp=1794858476069, value=Wollongong 
+ s3                   column=cf:name, timestamp=1794858476069, value=gina       
+7 row(s) in 0.0160 seconds
+
+nil
+7 row(s) in 0.0090 seconds
+
+7
+[PASS] hbase shell exit code 0
+[PASS] get b1 (batch write)
+[PASS] get s3 (streaming write)
+[PASS] scan shows b4
+[PASS] scan shows s2
+[PASS] 7 rows in total (4 batch + 3 streaming)
+
+=== Hive external table over the HBase table (HBaseStorageHandler)
+
+$ cat /home/bigdata/project/env/smoke/scripts/10_hive_hbase.sql
+DROP TABLE IF EXISTS smoke_hive_hbase;
+
+-- Hive external table over the existing HBase table (nothing is copied)
+CREATE EXTERNAL TABLE smoke_hive_hbase (rowkey STRING, name STRING, city STRING)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ('hbase.columns.mapping' = ':key,cf:name,cf:city')
+TBLPROPERTIES ('hbase.table.name' = 'smoke_spark_hb');
+
+SELECT * FROM smoke_hive_hbase;
+
+-- an aggregate, so the HBase table is also read by a MapReduce job on YARN
+SELECT city, COUNT(*) AS people FROM smoke_hive_hbase GROUP BY city;
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -f /home/bigdata/project/env/smoke/scripts/10_hive_hbase.sql
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS smoke_hive_hbase;
+No rows affected (0.024 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Hive external table over the existing HBase  table (nothing is copied)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE smoke_hive_hbase (rowkey  STRING, name STRING, city STRING)
+. . . . . . . . . . . . . . . .> STORED BY 'org.apache.hadoop.hive.hbase.HBaseSt orageHandler'
+. . . . . . . . . . . . . . . .> WITH SERDEPROPERTIES ('hbase.columns.mapping' =  ':key,cf:name,cf:city')
+. . . . . . . . . . . . . . . .> TBLPROPERTIES ('hbase.table.name' = 'smoke_spar k_hb');
+No rows affected (0.073 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> SELECT * FROM smoke_hive_hbase;
++--------------------------+------------------------+------------------------+
+| smoke_hive_hbase.rowkey  | smoke_hive_hbase.name  | smoke_hive_hbase.city  |
++--------------------------+------------------------+------------------------+
+| b1                       | alice                  | Dubai                  |
+| b2                       | bob                    | Sydney                 |
+| b3                       | carol                  | Wollongong             |
+| b4                       | dave                   | Dubai                  |
+| s1                       | erin                   | Sydney                 |
+| s2                       | frank                  | Dubai                  |
+| s3                       | gina                   | Wollongong             |
++--------------------------+------------------------+------------------------+
+7 rows selected (0.466 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- an aggregate, so the HBase table is also rea d by a MapReduce job on YARN
+0: jdbc:hive2://localhost:10000> SELECT city, COUNT(*) AS people FROM smoke_hive _hbase GROUP BY city;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++-------------+---------+
+|    city     | people  |
++-------------+---------+
+| Dubai       | 3       |
+| Sydney      | 2       |
+| Wollongong  | 2       |
++-------------+---------+
+3 rows selected (19.015 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> Closing: 0: jdbc:hive2://localhost:10000
+[PASS] beeline exit code 0
+[PASS] no HiveServer2 error
+[PASS] Hive reads a batch row from HBase
+[PASS] Hive reads a streaming row from HBase
+[PASS] Hive-on-MapReduce aggregate over HBase: Dubai = 3
+[PASS] Hive-on-MapReduce aggregate over HBase: Sydney = 2
+[PASS] Hive-on-MapReduce aggregate over HBase: Wollongong = 2
+
+--- clean up
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e 'DROP TABLE smoke_hive_hbase;'
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+No rows affected (0.055 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] Hive table dropped
+
+$ hdfs dfs -rm -r -f -skipTrash /user/hive/warehouse/smoke_hive_hbase
+26/11/16 19:48:46 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Deleted /user/hive/warehouse/smoke_hive_hbase
+[PASS] empty warehouse folder of the external table removed
+
+$ hbase shell -n <<'HB'
+disable 'smoke_spark_hb'
+drop 'smoke_spark_hb'
+list
+HB
+2026-11-16 19:48:48,028 WARN  [main] util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hbase/lib/slf4j-log4j12-1.7.5.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.slf4j.impl.Log4jLoggerFactory]
+0 row(s) in 2.3010 seconds
+
+nil
+0 row(s) in 1.2240 seconds
+
+nil
+TABLE                                                                           
+0 row(s) in 0.0050 seconds
+
+[PASS] HBase table dropped
+
+$ kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic smoke_hb_stream
+[PASS] topic deleted
+
+$ hdfs dfs -rm -r -skipTrash /user/bigdata/smoke_hb_stream
+26/11/16 19:48:53 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Deleted /user/bigdata/smoke_hb_stream
+[PASS] checkpoint folder removed
+
+finished:   2026-11-16 19:48:53 UTC
+RESULT: PASS (10_spark_hbase)
+[test script exit code 0]

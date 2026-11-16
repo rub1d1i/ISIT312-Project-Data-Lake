@@ -1,0 +1,121 @@
+# run from the Mac with: ./lake.sh exec 'bash /home/bigdata/project/env/smoke/scripts/01_daemons.sh'
+==============================================================================
+SMOKE TEST: 01_daemons
+started:    2026-11-16 19:36:24 UTC   host: datalake   user: bigdata
+==============================================================================
+
+$ jps | grep -v ' Jps$' | sort -k2
+149 DataNode
+1633 HMaster
+1561 HQuorumPeer
+1862 HRegionServer
+732 JobHistoryServer
+3080 Kafka
+47 NameNode
+535 NodeManager
+2623 QuorumPeerMain
+269 ResourceManager
+1061 RunJar
+891 RunJar
+[PASS] jps lists NameNode
+[PASS] jps lists DataNode
+[PASS] jps lists ResourceManager
+[PASS] jps lists NodeManager
+[PASS] jps lists JobHistoryServer
+[PASS] jps lists HQuorumPeer
+[PASS] jps lists HMaster
+[PASS] jps lists HRegionServer
+[PASS] jps lists QuorumPeerMain
+[PASS] jps lists Kafka
+[PASS] jps lists 2 x RunJar (Hive metastore + HiveServer2)
+
+$ hdfs dfsadmin -report
+26/11/16 19:36:24 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Configured Capacity: 63088406528 (58.76 GB)
+Present Capacity: 56352573809 (52.48 GB)
+DFS Remaining: 56352174945 (52.48 GB)
+DFS Used: 398864 (389.52 KB)
+DFS Used%: 0.00%
+Under replicated blocks: 0
+Blocks with corrupt replicas: 0
+Missing blocks: 0
+Missing blocks (with replication factor 1): 0
+
+-------------------------------------------------
+Live datanodes (1):
+
+Name: 127.0.0.1:50010 (localhost)
+Hostname: localhost
+Decommission Status : Normal
+Configured Capacity: 63088406528 (58.76 GB)
+DFS Used: 398864 (389.52 KB)
+Non DFS Used: 6735832719 (6.27 GB)
+DFS Remaining: 56352174945 (52.48 GB)
+DFS Used%: 0.00%
+DFS Remaining%: 89.32%
+Configured Cache Capacity: 0 (0 B)
+Cache Used: 0 (0 B)
+Cache Remaining: 0 (0 B)
+Cache Used%: 100.00%
+Cache Remaining%: 0.00%
+Xceivers: 7
+Last contact: Mon Nov 16 19:36:23 UTC 2026
+
+
+[PASS] HDFS has 1 live datanode
+
+$ hdfs dfsadmin -safemode get
+26/11/16 19:36:25 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Safe mode is OFF
+[PASS] HDFS is out of safe mode
+
+$ yarn node -list
+26/11/16 19:36:25 INFO client.RMProxy: Connecting to ResourceManager at localhost/127.0.0.1:8032
+26/11/16 19:36:25 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Total Nodes:1
+         Node-Id	     Node-State	Node-Http-Address	Number-of-Running-Containers
+ localhost:36043	        RUNNING	   localhost:8042	                           0
+[PASS] YARN has 1 running NodeManager
+
+$ lakectl status
+== java processes (jps) ==
+149 DataNode
+1633 HMaster
+1561 HQuorumPeer
+1862 HRegionServer
+732 JobHistoryServer
+3080 Kafka
+47 NameNode
+535 NodeManager
+2623 QuorumPeerMain
+269 ResourceManager
+1061 RunJar
+891 RunJar
+
+== services ==
+  SERVICE                    PID        PORT    STATE
+  NameNode (RPC)             47         8020    open
+  NameNode (web UI)          47         50070   open
+  DataNode (web UI)          149        50075   open
+  ResourceManager (UI)       269        8088    open
+  NodeManager (UI)           535        8042    open
+  JobHistoryServer (UI)      732        19888   open
+  Hive metastore             891        9083    open
+  HiveServer2 (JDBC)         1061       10000   open
+  HiveServer2 (web UI)       1061       10002   open
+  HBase ZooKeeper            1561       2181    open
+  HBase Master (RPC)         1633       16000   open
+  HBase Master (web UI)      1633       16010   open
+  HBase RegionServer (RPC)   1862       16201   open
+  Kafka ZooKeeper            2623       2182    open
+  Kafka broker               3080       9092    open
+
+  HDFS: Safe mode is OFF, live datanodes: 1
+  YARN: active nodes: 1, memory MB total/allocated: 8192/0
+
+  RESULT: all services are up
+[PASS] lakectl reports every service up
+
+finished:   2026-11-16 19:36:27 UTC
+RESULT: PASS (01_daemons)
+[test script exit code 0]

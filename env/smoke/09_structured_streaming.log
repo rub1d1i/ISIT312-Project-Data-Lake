@@ -1,0 +1,255 @@
+# run from the Mac with: ./lake.sh exec 'bash /home/bigdata/project/env/smoke/scripts/09_structured_streaming.sh'
+==============================================================================
+SMOKE TEST: 09_structured_streaming
+started:    2026-11-16 19:39:34 UTC   host: datalake   user: bigdata
+==============================================================================
+
+$ hdfs dfs -rm -r -f -skipTrash /user/bigdata/smoke_stream
+26/11/16 19:39:38 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+
+$ kafka-topics.sh --bootstrap-server localhost:9092 --create --topic smoke_stream --partitions 3 --replication-factor 1
+WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.
+Created topic smoke_stream.
+[PASS] input topic created
+
+$ kafka-topics.sh --bootstrap-server localhost:9092 --create --topic smoke_stream_out --partitions 1 --replication-factor 1
+WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.
+Created topic smoke_stream_out.
+[PASS] output topic created
+
+--- batch 1: produced BEFORE spark starts (read thanks to startingOffsets=earliest)
+
+$ printf '%s\n' '{"ts":"2026-11-16 10:00:05","device":"d1","value":1.0}' '{"ts":"2026-11-16 10:00:20","device":"d1","value":3.0}' '{"ts":"2026-11-16 10:00:40","device":"d2","value":10.0}' | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic smoke_stream
+[PASS] batch 1 produced
+
+$ cat /home/bigdata/project/env/smoke/scripts/09_streaming.scala
+// 09 - Structured Streaming: Kafka -> parse JSON -> (a) windowed count with watermark -> console
+//                                                   (b) parsed events -> Parquet files on HDFS
+// Run with:  spark-shell --master 'local[*]' -i 09_streaming.scala
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.streaming.Trigger
+
+val base = "hdfs://localhost:8020/user/bigdata/smoke_stream"
+val schema = new StructType().add("ts", TimestampType).add("device", StringType).add("value", DoubleType)
+
+val raw = spark.readStream.format("kafka").
+  option("kafka.bootstrap.servers", "localhost:9092").
+  option("subscribe", "smoke_stream").
+  option("startingOffsets", "earliest").
+  load()
+
+// Kafka gives key/value as bytes: cast the value to a string, then parse the JSON.
+val events = raw.selectExpr("CAST(value AS STRING) AS json", "partition", "offset").
+  select(from_json($"json", schema, Map("timestampFormat" -> "yyyy-MM-dd HH:mm:ss")).as("e"), $"partition", $"offset").
+  select("e.*", "partition", "offset")
+
+// (a) events per device per 1-minute event-time window; data more than 1 minute late is dropped
+val counts = events.
+  withWatermark("ts", "1 minute").
+  groupBy(window($"ts", "1 minute"), $"device").
+  agg(count("*").as("events"), avg("value").as("avg_value"))
+
+val q1 = counts.writeStream.queryName("smoke_console").
+  outputMode("update").format("console").option("truncate", "false").
+  option("checkpointLocation", base + "/chk_console").
+  trigger(Trigger.ProcessingTime("5 seconds")).start()
+
+// (b) the parsed events as Parquet files on HDFS, with a checkpoint
+val q2 = events.writeStream.queryName("smoke_parquet").
+  format("parquet").option("path", base + "/out").
+  option("checkpointLocation", base + "/chk_parquet").
+  trigger(Trigger.ProcessingTime("5 seconds")).start()
+
+println("### STREAMS STARTED: " + spark.streams.active.map(_.name).sorted.mkString(","))
+q1.awaitTermination(50000)          // let both queries run for 50 seconds
+
+println("### console query progress (batchId, inputRows, watermark):")
+q1.recentProgress.filter(_.numInputRows > 0).foreach(p => println(s"###   batch=${p.batchId} rows=${p.numInputRows} watermark=${p.eventTime.get("watermark")}"))
+q1.stop(); q2.stop()
+println("### active streams after stop: " + spark.streams.active.length)
+
+// what the file sink wrote, read back as a normal (batch) DataFrame
+val written = spark.read.parquet(base + "/out")
+written.orderBy("ts").show(false)
+println("### PARQUET_ROWS=" + written.count)
+
+// Kafka as a batch source and as a sink (same connector jar)
+println("### KAFKA_BATCH_ROWS=" + spark.read.format("kafka").option("kafka.bootstrap.servers", "localhost:9092").option("subscribe", "smoke_stream").load().count)
+Seq("hello from the spark kafka sink").toDF("value").write.format("kafka").option("kafka.bootstrap.servers", "localhost:9092").option("topic", "smoke_stream_out").save()
+println("### KAFKA_SINK_WRITTEN")
+System.exit(0)
+
+$ spark-shell --master 'local[*]' -i /home/bigdata/project/env/smoke/scripts/09_streaming.scala > /tmp/smoke09_spark.out 2>&1 &
+[PASS] both streaming queries started (after 6s)
+
+--- batch 2: produced while the queries run (moves the watermark to 10:02:30)
+
+$ printf '%s\n' '{"ts":"2026-11-16 10:01:10","device":"d1","value":5.0}' '{"ts":"2026-11-16 10:03:30","device":"d2","value":20.0}' | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic smoke_stream
+[PASS] batch 2 produced
+
+--- batch 3: one event that is too late (10:00:50, behind the watermark) and one on time
+
+$ printf '%s\n' '{"ts":"2026-11-16 10:00:50","device":"d1","value":99.0}' '{"ts":"2026-11-16 10:03:45","device":"d1","value":7.0}' | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic smoke_stream
+[PASS] batch 3 produced
+
+--- waiting for spark-shell to finish (it stops both queries itself after 50 s)
+
+$ cat /tmp/smoke09_spark.out
+26/11/16 19:39:42 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = local[*], app id = local-1794857984124).
+Spark session available as 'spark'.
+### STREAMS STARTED: smoke_console,smoke_parquet
+[Stage 0:>                                                          (0 + 1) / 1][Stage 0:>                  (0 + 1) / 1][Stage 1:>                  (0 + 1) / 1]                                                                                -------------------------------------------
+Batch: 0
+-------------------------------------------
++------------------------------------------+------+------+---------+
+|window                                    |device|events|avg_value|
++------------------------------------------+------+------+---------+
+|[2026-11-16 10:00:00, 2026-11-16 10:01:00]|d1    |2     |2.0      |
+|[2026-11-16 10:00:00, 2026-11-16 10:01:00]|d2    |1     |10.0     |
++------------------------------------------+------+------+---------+
+
+-------------------------------------------
+Batch: 1
+-------------------------------------------
++------+------+------+---------+
+|window|device|events|avg_value|
++------+------+------+---------+
++------+------+------+---------+
+
+[Stage 5:>                                                          (0 + 1) / 1]                                                                                -------------------------------------------
+Batch: 2
+-------------------------------------------
++------------------------------------------+------+------+---------+
+|window                                    |device|events|avg_value|
++------------------------------------------+------+------+---------+
+|[2026-11-16 10:01:00, 2026-11-16 10:02:00]|d1    |1     |5.0      |
+|[2026-11-16 10:03:00, 2026-11-16 10:04:00]|d2    |1     |20.0     |
++------------------------------------------+------+------+---------+
+
+-------------------------------------------
+Batch: 3
+-------------------------------------------
++------+------+------+---------+
+|window|device|events|avg_value|
++------+------+------+---------+
++------+------+------+---------+
+
+[Stage 10:>                                                         (0 + 1) / 1]                                                                                -------------------------------------------
+Batch: 4
+-------------------------------------------
++------------------------------------------+------+------+---------+
+|window                                    |device|events|avg_value|
++------------------------------------------+------+------+---------+
+|[2026-11-16 10:03:00, 2026-11-16 10:04:00]|d1    |1     |7.0      |
++------------------------------------------+------+------+---------+
+
+-------------------------------------------
+Batch: 5
+-------------------------------------------
++------+------+------+---------+
+|window|device|events|avg_value|
++------+------+------+---------+
++------+------+------+---------+
+
+### console query progress (batchId, inputRows, watermark):
+###   batch=0 rows=3 watermark=1970-01-01T00:00:00.000Z
+###   batch=2 rows=2 watermark=2026-11-16T09:59:40.000Z
+###   batch=4 rows=2 watermark=2026-11-16T10:02:30.000Z
+### active streams after stop: 0
++-------------------+------+-----+---------+------+
+|ts                 |device|value|partition|offset|
++-------------------+------+-----+---------+------+
+|2026-11-16 10:00:05|d1    |1.0  |1        |0     |
+|2026-11-16 10:00:20|d1    |3.0  |1        |1     |
+|2026-11-16 10:00:40|d2    |10.0 |1        |2     |
+|2026-11-16 10:00:50|d1    |99.0 |2        |0     |
+|2026-11-16 10:01:10|d1    |5.0  |0        |0     |
+|2026-11-16 10:03:30|d2    |20.0 |0        |1     |
+|2026-11-16 10:03:45|d1    |7.0  |2        |1     |
++-------------------+------+-----+---------+------+
+
+### PARQUET_ROWS=7
+### KAFKA_BATCH_ROWS=7
+### KAFKA_SINK_WRITTEN
+[PASS] spark-shell exit code 0
+[PASS] no Scala/Spark error in the shell output
+[PASS] console sink printed micro-batches
+[PASS] window 10:00-10:01, d1: 2 events, avg 2.0 (batch 1)
+[PASS] window 10:00-10:01, d2: 1 event (batch 1)
+[PASS] window 10:01-10:02, d1: 1 event (batch 2)
+[PASS] window 10:03-10:04, d2: 1 event (batch 2)
+[PASS] window 10:03-10:04, d1: 1 event (batch 3)
+[PASS] watermark dropped the late event (10:00 window of d1 never reaches 3)
+[PASS] watermark advanced to 10:02:30 after batch 2
+[PASS] both queries stopped cleanly
+[PASS] file sink wrote all 7 events (it has no watermark)
+[PASS] Kafka batch read sees 7 messages
+[PASS] Kafka sink write done
+
+$ hdfs dfs -ls -R /user/bigdata/smoke_stream | grep -v -E '/chk_[a-z]+/(state|sources)/'
+26/11/16 19:40:37 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_console
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/commits
+-rw-r--r--   1 bigdata supergroup         41 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_console/commits/0
+-rw-r--r--   1 bigdata supergroup         41 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_console/commits/1
+-rw-r--r--   1 bigdata supergroup         41 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/commits/2
+-rw-r--r--   1 bigdata supergroup         41 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/commits/3
+-rw-r--r--   1 bigdata supergroup         41 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/commits/4
+-rw-r--r--   1 bigdata supergroup         41 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/commits/5
+-rw-r--r--   1 bigdata supergroup         45 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_console/metadata
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/offsets
+-rw-r--r--   1 bigdata supergroup        441 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_console/offsets/0
+-rw-r--r--   1 bigdata supergroup        453 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_console/offsets/1
+-rw-r--r--   1 bigdata supergroup        453 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/offsets/2
+-rw-r--r--   1 bigdata supergroup        453 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/offsets/3
+-rw-r--r--   1 bigdata supergroup        453 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/offsets/4
+-rw-r--r--   1 bigdata supergroup        453 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_console/offsets/5
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_console/sources
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_console/state
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_parquet
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_parquet/commits
+-rw-r--r--   1 bigdata supergroup         29 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_parquet/commits/0
+-rw-r--r--   1 bigdata supergroup         29 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_parquet/commits/1
+-rw-r--r--   1 bigdata supergroup         29 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_parquet/commits/2
+-rw-r--r--   1 bigdata supergroup         45 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_parquet/metadata
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_parquet/offsets
+-rw-r--r--   1 bigdata supergroup        441 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_parquet/offsets/0
+-rw-r--r--   1 bigdata supergroup        441 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_parquet/offsets/1
+-rw-r--r--   1 bigdata supergroup        441 2026-11-16 19:40 /user/bigdata/smoke_stream/chk_parquet/offsets/2
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:39 /user/bigdata/smoke_stream/chk_parquet/sources
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:40 /user/bigdata/smoke_stream/out
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:40 /user/bigdata/smoke_stream/out/_spark_metadata
+-rw-r--r--   1 bigdata supergroup        250 2026-11-16 19:39 /user/bigdata/smoke_stream/out/_spark_metadata/0
+-rw-r--r--   1 bigdata supergroup        250 2026-11-16 19:40 /user/bigdata/smoke_stream/out/_spark_metadata/1
+-rw-r--r--   1 bigdata supergroup        250 2026-11-16 19:40 /user/bigdata/smoke_stream/out/_spark_metadata/2
+-rw-r--r--   1 bigdata supergroup       1401 2026-11-16 19:39 /user/bigdata/smoke_stream/out/part-00000-0f4f673f-3af1-4e60-ab82-1bcb521e6879-c000.snappy.parquet
+-rw-r--r--   1 bigdata supergroup       1395 2026-11-16 19:40 /user/bigdata/smoke_stream/out/part-00000-abfa4b65-9ffb-4c25-95e6-52d780d7fe1c-c000.snappy.parquet
+-rw-r--r--   1 bigdata supergroup       1359 2026-11-16 19:40 /user/bigdata/smoke_stream/out/part-00000-c68db6f8-c5eb-4f8a-a5ad-9de3be52787c-c000.snappy.parquet
+[PASS] Parquet part files on HDFS
+[PASS] file sink log (_spark_metadata)
+[PASS] checkpoint: offsets
+[PASS] checkpoint: commits
+
+$ kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic smoke_stream_out --from-beginning --max-messages 1 --timeout-ms 30000
+hello from the spark kafka sink
+Processed a total of 1 messages
+[PASS] message written by the Spark Kafka sink is in the topic
+
+--- clean up
+
+$ kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic smoke_stream; kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic smoke_stream_out
+[PASS] topics deleted
+
+$ hdfs dfs -rm -r -skipTrash /user/bigdata/smoke_stream
+26/11/16 19:40:40 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Deleted /user/bigdata/smoke_stream
+[PASS] HDFS folder removed
+
+finished:   2026-11-16 19:40:40 UTC
+RESULT: PASS (09_structured_streaming)
+[test script exit code 0]

@@ -1,0 +1,171 @@
+# run from the Mac with: ./lake.sh exec 'bash /home/bigdata/project/env/smoke/scripts/05_hive_beeline.sh'
+==============================================================================
+SMOKE TEST: 05_hive_beeline
+started:    2026-11-16 19:36:55 UTC   host: datalake   user: bigdata
+==============================================================================
+
+$ hdfs dfs -rm -r -f -skipTrash /user/bigdata/smoke_hive
+26/11/16 19:36:55 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+
+$ hdfs dfs -mkdir -p /user/bigdata/smoke_hive/staging /user/bigdata/smoke_hive/sales
+26/11/16 19:36:56 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+
+$ printf '1,apple,10.0\n2,banana,20.0\n3,apple,5.0\n' > /tmp/smoke_east.csv; printf '4,apple,7.5\n5,cherry,12.5\n' > /tmp/smoke_west.csv
+
+$ hdfs dfs -put -f /tmp/smoke_east.csv /user/bigdata/smoke_hive/staging/east.csv && hdfs dfs -put -f /tmp/smoke_west.csv /user/bigdata/smoke_hive/staging/west.csv
+26/11/16 19:36:56 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/16 19:36:57 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+[PASS] staging files uploaded
+
+$ cat /home/bigdata/project/env/smoke/scripts/05_hive.sql
+DROP TABLE IF EXISTS smoke_sales;
+
+-- external, partitioned table over an HDFS folder
+CREATE EXTERNAL TABLE smoke_sales (id INT, product STRING, amount DOUBLE)
+PARTITIONED BY (region STRING)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/user/bigdata/smoke_hive/sales';
+
+LOAD DATA INPATH '/user/bigdata/smoke_hive/staging/east.csv' INTO TABLE smoke_sales PARTITION (region='east');
+LOAD DATA INPATH '/user/bigdata/smoke_hive/staging/west.csv' INTO TABLE smoke_sales PARTITION (region='west');
+
+SHOW PARTITIONS smoke_sales;
+SELECT * FROM smoke_sales;
+
+-- GROUP BY ... WITH ROLLUP (runs as a MapReduce job on YARN)
+SELECT region, product, SUM(amount) AS total
+FROM smoke_sales
+GROUP BY region, product WITH ROLLUP;
+
+-- window functions (runs as a MapReduce job on YARN)
+SELECT id, region, product, amount,
+       RANK() OVER (PARTITION BY region ORDER BY amount DESC) AS rnk,
+       SUM(amount) OVER (PARTITION BY region) AS region_total
+FROM smoke_sales;
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -f /home/bigdata/project/env/smoke/scripts/05_hive.sql
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS smoke_sales;
+No rows affected (0.033 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- external, partitioned table over an HDFS fol der
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE smoke_sales (id INT, prod uct STRING, amount DOUBLE)
+. . . . . . . . . . . . . . . .> PARTITIONED BY (region STRING)
+. . . . . . . . . . . . . . . .> ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/user/bigdata/smoke_hive/sales';
+No rows affected (0.058 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> LOAD DATA INPATH '/user/bigdata/smoke_hive/stag ing/east.csv' INTO TABLE smoke_sales PARTITION (region='east');
+No rows affected (0.466 seconds)
+0: jdbc:hive2://localhost:10000> LOAD DATA INPATH '/user/bigdata/smoke_hive/stag ing/west.csv' INTO TABLE smoke_sales PARTITION (region='west');
+No rows affected (0.246 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> SHOW PARTITIONS smoke_sales;
++--------------+
+|  partition   |
++--------------+
+| region=east  |
+| region=west  |
++--------------+
+2 rows selected (0.068 seconds)
+0: jdbc:hive2://localhost:10000> SELECT * FROM smoke_sales;
++-----------------+----------------------+---------------------+---------------------+
+| smoke_sales.id  | smoke_sales.product  | smoke_sales.amount  | smoke_sales.region  |
++-----------------+----------------------+---------------------+---------------------+
+| 1               | apple                | 10.0                | east                |
+| 2               | banana               | 20.0                | east                |
+| 3               | apple                | 5.0                 | east                |
+| 4               | apple                | 7.5                 | west                |
+| 5               | cherry               | 12.5                | west                |
++-----------------+----------------------+---------------------+---------------------+
+5 rows selected (0.089 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- GROUP BY ... WITH ROLLUP (runs as a MapReduc e job on YARN)
+0: jdbc:hive2://localhost:10000> SELECT region, product, SUM(amount) AS total
+. . . . . . . . . . . . . . . .> FROM smoke_sales
+. . . . . . . . . . . . . . . .> GROUP BY region, product WITH ROLLUP;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++---------+----------+--------+
+| region  | product  | total  |
++---------+----------+--------+
+| NULL    | NULL     | 55.0   |
+| east    | NULL     | 35.0   |
+| west    | NULL     | 20.0   |
+| east    | apple    | 15.0   |
+| west    | apple    | 7.5    |
+| east    | banana   | 20.0   |
+| west    | cherry   | 12.5   |
++---------+----------+--------+
+7 rows selected (11.484 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- window functions (runs as a MapReduce job on  YARN)
+0: jdbc:hive2://localhost:10000> SELECT id, region, product, amount,
+. . . . . . . . . . . . . . . .>        RANK() OVER (PARTITION BY region ORDER B Y amount DESC) AS rnk,
+. . . . . . . . . . . . . . . .>        SUM(amount) OVER (PARTITION BY region) A S region_total
+. . . . . . . . . . . . . . . .> FROM smoke_sales;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++-----+---------+----------+---------+------+---------------+
+| id  | region  | product  | amount  | rnk  | region_total  |
++-----+---------+----------+---------+------+---------------+
+| 3   | east    | apple    | 5.0     | 3    | 35.0          |
+| 1   | east    | apple    | 10.0    | 2    | 35.0          |
+| 2   | east    | banana   | 20.0    | 1    | 35.0          |
+| 4   | west    | apple    | 7.5     | 2    | 20.0          |
+| 5   | west    | cherry   | 12.5    | 1    | 20.0          |
++-----+---------+----------+---------+------+---------------+
+5 rows selected (22.737 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> Closing: 0: jdbc:hive2://localhost:10000
+[PASS] beeline script exit code 0
+[PASS] no error reported by HiveServer2
+[PASS] both partitions exist
+[PASS] both partitions exist (west)
+[PASS] ROLLUP subtotal for east = 35.0
+[PASS] ROLLUP subtotal for west = 20.0
+[PASS] ROLLUP grand total = 55.0
+[PASS] window function: banana ranks 1st in east, region_total 35.0
+[PASS] window function: cherry ranks 1st in west, region_total 20.0
+
+$ hdfs dfs -ls -R /user/bigdata/smoke_hive/sales
+26/11/16 19:37:34 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:36 /user/bigdata/smoke_hive/sales/region=east
+-rwxr-xr-x   1 bigdata supergroup         39 2026-11-16 19:36 /user/bigdata/smoke_hive/sales/region=east/east.csv
+drwxr-xr-x   - bigdata supergroup          0 2026-11-16 19:36 /user/bigdata/smoke_hive/sales/region=west
+-rwxr-xr-x   1 bigdata supergroup         26 2026-11-16 19:36 /user/bigdata/smoke_hive/sales/region=west/west.csv
+[PASS] LOAD moved the file into the partition folder
+
+--- clean up
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e 'DROP TABLE smoke_sales;'
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+No rows affected (0.085 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] drop table
+
+$ hdfs dfs -rm -r -skipTrash /user/bigdata/smoke_hive
+26/11/16 19:37:36 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Deleted /user/bigdata/smoke_hive
+[PASS] remove HDFS folder
+
+finished:   2026-11-16 19:37:36 UTC
+RESULT: PASS (05_hive_beeline)
+[test script exit code 0]

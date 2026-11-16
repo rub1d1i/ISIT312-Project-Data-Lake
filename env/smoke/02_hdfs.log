@@ -1,0 +1,47 @@
+# run from the Mac with: ./lake.sh exec 'bash /home/bigdata/project/env/smoke/scripts/02_hdfs.sh'
+==============================================================================
+SMOKE TEST: 02_hdfs
+started:    2026-11-16 19:36:27 UTC   host: datalake   user: bigdata
+==============================================================================
+
+$ hdfs dfs -rm -r -f -skipTrash /user/bigdata/smoke_hdfs
+26/11/16 19:36:27 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+
+$ hdfs dfs -mkdir -p /user/bigdata/smoke_hdfs
+26/11/16 19:36:27 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+[PASS] mkdir
+
+$ printf 'hello data lake\nsecond line\n' > /tmp/smoke_hello.txt
+
+$ hdfs dfs -put -f /tmp/smoke_hello.txt /user/bigdata/smoke_hdfs/
+26/11/16 19:36:28 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+[PASS] put
+
+$ hdfs dfs -ls /user/bigdata/smoke_hdfs
+26/11/16 19:36:28 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Found 1 items
+-rw-r--r--   1 bigdata supergroup         28 2026-11-16 19:36 /user/bigdata/smoke_hdfs/smoke_hello.txt
+[PASS] ls shows the file
+
+$ hdfs dfs -cat /user/bigdata/smoke_hdfs/smoke_hello.txt
+26/11/16 19:36:29 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+hello data lake
+second line
+[PASS] cat returns the content
+
+$ hdfs dfs -ls smoke_hdfs
+26/11/16 19:36:29 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Found 1 items
+-rw-r--r--   1 bigdata supergroup         28 2026-11-16 19:36 smoke_hdfs/smoke_hello.txt
+[PASS] relative path resolves to /user/bigdata
+
+--- clean up
+
+$ hdfs dfs -rm -r -skipTrash /user/bigdata/smoke_hdfs
+26/11/16 19:36:30 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Deleted /user/bigdata/smoke_hdfs
+[PASS] clean up
+
+finished:   2026-11-16 19:36:30 UTC
+RESULT: PASS (02_hdfs)
+[test script exit code 0]

@@ -1,0 +1,204 @@
+# run from the Mac with: ./lake.sh exec 'bash /home/bigdata/project/env/smoke/scripts/11_yarn_concurrency.sh'
+==============================================================================
+SMOKE TEST: 11_yarn_concurrency
+started:    2026-11-16 19:44:17 UTC   host: datalake   user: bigdata
+==============================================================================
+
+$ kafka-topics.sh --bootstrap-server localhost:9092 --create --topic smoke_stream --partitions 3 --replication-factor 1 && kafka-topics.sh --bootstrap-server localhost:9092 --create --topic smoke_stream_out --partitions 1 --replication-factor 1
+WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.
+Created topic smoke_stream.
+WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.
+Created topic smoke_stream_out.
+[PASS] topics created
+
+$ hdfs dfs -mkdir -p /user/bigdata/smoke_conc && printf 'a\nb\nc\nd\n' | hdfs dfs -put -f - /user/bigdata/smoke_conc/rows.txt
+26/11/16 19:44:24 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/16 19:44:24 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e "DROP TABLE IF EXISTS smoke_conc; CREATE EXTERNAL TABLE smoke_conc (v STRING) LOCATION '/user/bigdata/smoke_conc';"
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+No rows affected (0.018 seconds)
+No rows affected (0.013 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] Hive table for the concurrent query created
+
+$ printf '%s\n' '{"ts":"2026-11-16 10:00:05","device":"d1","value":1.0}' '{"ts":"2026-11-16 10:00:20","device":"d1","value":3.0}' '{"ts":"2026-11-16 10:00:40","device":"d2","value":10.0}' | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic smoke_stream
+
+$ spark-shell --master yarn -i /home/bigdata/project/env/smoke/scripts/09_streaming.scala > /tmp/smoke11_spark.out 2>&1 &
+[PASS] streaming queries started on YARN (after 10s)
+
+$ yarn application -list -appStates RUNNING 2>/dev/null
+Total number of applications (application-types: [] and states: [RUNNING]):1
+                Application-Id	    Application-Name	    Application-Type	      User	     Queue	             State	       Final-State	       Progress	                       Tracking-URL
+application_1794857713160_0016	         Spark shell	               SPARK	   bigdata	   default	           RUNNING	         UNDEFINED	            10%	               http://datalake:4040
+[PASS] the Spark application is RUNNING on YARN
+
+--- a Hive query (MapReduce job) while the Spark application is still running
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e 'SELECT COUNT(*) AS n FROM smoke_conc;'
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++----+
+| n  |
++----+
+| 4  |
++----+
+1 row selected (12.322 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] beeline exit code 0
+[PASS] no HiveServer2 error
+[PASS] Hive MapReduce job returned its result
+
+$ yarn application -list -appStates RUNNING 2>/dev/null
+Total number of applications (application-types: [] and states: [RUNNING]):1
+                Application-Id	    Application-Name	    Application-Type	      User	     Queue	             State	       Final-State	       Progress	                       Tracking-URL
+application_1794857713160_0016	         Spark shell	               SPARK	   bigdata	   default	           RUNNING	         UNDEFINED	            10%	               http://datalake:4040
+[PASS] the Spark application was still RUNNING when the Hive job finished
+
+$ printf '%s\n' '{"ts":"2026-11-16 10:01:10","device":"d1","value":5.0}' '{"ts":"2026-11-16 10:03:30","device":"d2","value":20.0}' | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic smoke_stream
+
+$ printf '%s\n' '{"ts":"2026-11-16 10:00:50","device":"d1","value":99.0}' '{"ts":"2026-11-16 10:03:45","device":"d1","value":7.0}' | kafka-console-producer.sh --bootstrap-server localhost:9092 --topic smoke_stream
+
+--- waiting for spark-shell to finish
+
+$ cat /tmp/smoke11_spark.out
+26/11/16 19:44:27 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = yarn, app id = application_1794857713160_0016).
+Spark session available as 'spark'.
+### STREAMS STARTED: smoke_console,smoke_parquet
+[Stage 0:>                                                          (0 + 1) / 1][Stage 0:>                  (0 + 1) / 1][Stage 1:>                  (0 + 0) / 1]                                                                                [Stage 1:>                                                          (0 + 1) / 1][Stage 2:====================================>                      (5 + 2) / 8][Stage 2:============================================>              (6 + 2) / 8][Stage 2:===================================================>       (7 + 1) / 8]                                                                                -------------------------------------------
+Batch: 0
+-------------------------------------------
++------------------------------------------+------+------+---------+
+|window                                    |device|events|avg_value|
++------------------------------------------+------+------+---------+
+|[2026-11-16 10:00:00, 2026-11-16 10:01:00]|d1    |2     |2.0      |
+|[2026-11-16 10:00:00, 2026-11-16 10:01:00]|d2    |1     |10.0     |
++------------------------------------------+------+------+---------+
+
+[Stage 4:==============>                                            (2 + 1) / 8][Stage 4:======================>                                    (3 + 1) / 8][Stage 4:=============================>                             (4 + 1) / 8][Stage 4:====================================>                      (5 + 1) / 8][Stage 4:============================================>              (6 + 1) / 8][Stage 4:===================================================>       (7 + 1) / 8]                                                                                -------------------------------------------
+Batch: 1
+-------------------------------------------
++------+------+------+---------+
+|window|device|events|avg_value|
++------+------+------+---------+
++------+------+------+---------+
+
+[Stage 5:>                  (0 + 1) / 1][Stage 6:>                  (0 + 0) / 1]                                                                                [Stage 6:>                                                          (0 + 1) / 1][Stage 7:======================>                                    (3 + 1) / 8][Stage 7:=============================>                             (4 + 1) / 8][Stage 7:====================================>                      (5 + 1) / 8][Stage 7:============================================>              (6 + 1) / 8]                                                                                -------------------------------------------
+Batch: 2
+-------------------------------------------
++------------------------------------------+------+------+---------+
+|window                                    |device|events|avg_value|
++------------------------------------------+------+------+---------+
+|[2026-11-16 10:01:00, 2026-11-16 10:02:00]|d1    |1     |5.0      |
+|[2026-11-16 10:03:00, 2026-11-16 10:04:00]|d2    |1     |20.0     |
++------------------------------------------+------+------+---------+
+
+[Stage 9:==============>                                            (2 + 1) / 8][Stage 9:======================>                                    (3 + 1) / 8][Stage 9:=============================>                             (4 + 1) / 8][Stage 9:====================================>                      (5 + 1) / 8][Stage 9:===================================================>       (7 + 1) / 8]                                                                                -------------------------------------------
+Batch: 3
+-------------------------------------------
++------+------+------+---------+
+|window|device|events|avg_value|
++------+------+------+---------+
++------+------+------+---------+
+
+[Stage 10:>                 (0 + 1) / 1][Stage 11:>                 (0 + 0) / 1]                                                                                [Stage 12:=====================>                                    (3 + 1) / 8][Stage 12:====================================>                     (5 + 1) / 8]                                                                                -------------------------------------------
+Batch: 4
+-------------------------------------------
++------------------------------------------+------+------+---------+
+|window                                    |device|events|avg_value|
++------------------------------------------+------+------+---------+
+|[2026-11-16 10:03:00, 2026-11-16 10:04:00]|d1    |1     |7.0      |
++------------------------------------------+------+------+---------+
+
+[Stage 14:==============>                                           (2 + 1) / 8][Stage 14:=====================>                                    (3 + 1) / 8][Stage 14:=============================>                            (4 + 1) / 8][Stage 14:====================================>                     (5 + 1) / 8][Stage 14:==================================================>       (7 + 1) / 8]                                                                                -------------------------------------------
+Batch: 5
+-------------------------------------------
++------+------+------+---------+
+|window|device|events|avg_value|
++------+------+------+---------+
++------+------+------+---------+
+
+### console query progress (batchId, inputRows, watermark):
+###   batch=0 rows=3 watermark=1970-01-01T00:00:00.000Z
+###   batch=2 rows=2 watermark=2026-11-16T09:59:40.000Z
+###   batch=4 rows=2 watermark=2026-11-16T10:02:30.000Z
+### active streams after stop: 0
++-------------------+------+-----+---------+------+
+|ts                 |device|value|partition|offset|
++-------------------+------+-----+---------+------+
+|2026-11-16 10:00:05|d1    |1.0  |0        |0     |
+|2026-11-16 10:00:20|d1    |3.0  |0        |1     |
+|2026-11-16 10:00:40|d2    |10.0 |0        |2     |
+|2026-11-16 10:00:50|d1    |99.0 |1        |0     |
+|2026-11-16 10:01:10|d1    |5.0  |2        |0     |
+|2026-11-16 10:03:30|d2    |20.0 |2        |1     |
+|2026-11-16 10:03:45|d1    |7.0  |1        |1     |
++-------------------+------+-----+---------+------+
+
+### PARQUET_ROWS=7
+[Stage 19:>                                                         (0 + 2) / 3][Stage 19:======================================>                   (2 + 1) / 3]                                                                                ### KAFKA_BATCH_ROWS=7
+### KAFKA_SINK_WRITTEN
+[PASS] spark-shell exit code 0
+[PASS] no Scala/Spark error in the shell output
+[PASS] streaming on YARN printed micro-batches
+[PASS] windowed count correct on YARN
+[PASS] file sink wrote the events to HDFS
+[PASS] both queries stopped cleanly
+
+$ yarn application -list -appStates FINISHED,FAILED,KILLED 2>/dev/null | tail -4
+application_1794857713160_0004	SELECT id, region, product, am...smoke_sales(Stage-1)	           MAPREDUCE	   bigdata	   default	          FINISHED	         SUCCEEDED	           100%	http://datalake:19888/jobhistory/job/job_1794857713160_0004
+application_1794857713160_0003	SELECT region, product, SUM(amount)...ROLLUP(Stage-1)	           MAPREDUCE	   bigdata	   default	          FINISHED	         SUCCEEDED	           100%	http://datalake:19888/jobhistory/job/job_1794857713160_0003
+application_1794857713160_0002	streamjob1037037666700112001.jar	           MAPREDUCE	   bigdata	   default	          FINISHED	         SUCCEEDED	           100%	http://datalake:19888/jobhistory/job/job_1794857713160_0002
+application_1794857713160_0001	     QuasiMonteCarlo	           MAPREDUCE	   bigdata	   default	          FINISHED	         SUCCEEDED	           100%	http://datalake:19888/jobhistory/job/job_1794857713160_0001
+
+--- clean up
+
+$ beeline -u jdbc:hive2://localhost:10000 -n bigdata -e 'DROP TABLE smoke_conc;'
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+No rows affected (0.029 seconds)
+Beeline version 2.3.9 by Apache Hive
+Closing: 0: jdbc:hive2://localhost:10000
+[PASS] Hive table dropped
+
+$ kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic smoke_stream; kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic smoke_stream_out
+[PASS] topics deleted
+
+$ hdfs dfs -rm -r -skipTrash /user/bigdata/smoke_stream /user/bigdata/smoke_conc
+26/11/16 19:45:30 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Deleted /user/bigdata/smoke_stream
+Deleted /user/bigdata/smoke_conc
+[PASS] HDFS folders removed
+
+finished:   2026-11-16 19:45:31 UTC
+RESULT: PASS (11_yarn_concurrency)
+[test script exit code 0]
