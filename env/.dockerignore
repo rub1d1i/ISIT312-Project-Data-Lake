@@ -1,0 +1,5 @@
+# Only the Dockerfile, conf/ and lakectl are needed to build the image.
+smoke
+README.md
+lake.sh
+.DS_Store

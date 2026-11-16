@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<!-- ISIT312 data lake: replaces the base image's yarn-site.xml.
+     The first block is identical to the base image (hadoop-docker/conf/yarn-site.xml);
+     the second block holds the additions made for the data lake image. -->
+<configuration>
+  <!-- ===== unchanged from the base image ===== -->
+  <property>
+    <name>yarn.nodemanager.aux-services</name>
+    <value>mapreduce_shuffle</value>
+  </property>
+  <!-- Advertise "localhost" so the job links in the YARN web UI open from the Mac's browser,
+       but listen on all interfaces so Docker's published ports can reach the daemons. -->
+  <property>
+    <name>yarn.resourcemanager.hostname</name>
+    <value>localhost</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.bind-host</name>
+    <value>0.0.0.0</value>
+  </property>
+  <property>
+    <name>yarn.nodemanager.hostname</name>
+    <value>localhost</value>
+  </property>
+  <property>
+    <name>yarn.nodemanager.bind-host</name>
+    <value>0.0.0.0</value>
+  </property>
+  <property>
+    <name>yarn.nodemanager.vmem-check-enabled</name>
+    <value>false</value>
+  </property>
+
+  <!-- ===== changed / added for the data lake image ===== -->
+  <!-- Base image: 6144. The Colima VM has 14 GB; 8 GB of containers leaves room for the daemons
+       and lets a Spark-on-YARN job and a MapReduce/Hive job run at the same time. -->
+  <property>
+    <name>yarn.nodemanager.resource.memory-mb</name>
+    <value>8192</value>
+  </property>
+  <property>
+    <name>yarn.nodemanager.resource.cpu-vcores</name>
+    <value>8</value>
+  </property>
+  <!-- Default is 1024: requests are rounded UP to a multiple of this, so a Spark executor asking
+       for 1408 MB (1g + overhead) would take 2048. 512 wastes less of the single node. -->
+  <property>
+    <name>yarn.scheduler.minimum-allocation-mb</name>
+    <value>512</value>
+  </property>
+  <property>
+    <name>yarn.scheduler.maximum-allocation-mb</name>
+    <value>8192</value>
+  </property>
+  <!-- Default 90 %: above it the NodeManager marks its only disk "unhealthy" and every job then
+       hangs in ACCEPTED. On a one-node teaching setup a nearly-full disk should not stop YARN. -->
+  <property>
+    <name>yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage</name>
+    <value>98.5</value>
+  </property>
+</configuration>

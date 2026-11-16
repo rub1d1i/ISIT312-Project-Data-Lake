@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!-- ISIT312 data lake: replaces the base image's mapred-site.xml.
+     The first block is identical to the base image (hadoop-docker/conf/mapred-site.xml);
+     the second block holds the additions made for the data lake image. -->
+<configuration>
+  <!-- ===== unchanged from the base image ===== -->
+  <property>
+    <name>mapreduce.framework.name</name>
+    <value>yarn</value>
+  </property>
+  <!-- Same idea as yarn-site.xml: "History" links point at localhost, the server listens everywhere. -->
+  <property>
+    <name>mapreduce.jobhistory.address</name>
+    <value>localhost:10020</value>
+  </property>
+  <property>
+    <name>mapreduce.jobhistory.webapp.address</name>
+    <value>localhost:19888</value>
+  </property>
+  <property>
+    <name>mapreduce.jobhistory.bind-host</name>
+    <value>0.0.0.0</value>
+  </property>
+
+  <!-- ===== added for the data lake image ===== -->
+  <!-- Hadoop 2.7.3 defaults: 1024 MB map/reduce containers but only a 200 MB task heap
+       (mapred.child.java.opts=-Xmx200m) and a 1536 MB application master. The 200 MB heap is
+       too small for Hive-on-MapReduce over anything but toy data, so the heap is sized to the
+       container here. Container sizes stay small so several tasks fit on the single node. -->
+  <property>
+    <name>mapreduce.map.memory.mb</name>
+    <value>1024</value>
+  </property>
+  <property>
+    <name>mapreduce.map.java.opts</name>
+    <value>-Xmx768m</value>
+  </property>
+  <property>
+    <name>mapreduce.reduce.memory.mb</name>
+    <value>1024</value>
+  </property>
+  <property>
+    <name>mapreduce.reduce.java.opts</name>
+    <value>-Xmx768m</value>
+  </property>
+  <property>
+    <name>yarn.app.mapreduce.am.resource.mb</name>
+    <value>1024</value>
+  </property>
+  <property>
+    <name>yarn.app.mapreduce.am.command-opts</name>
+    <value>-Xmx768m</value>
+  </property>
+</configuration>

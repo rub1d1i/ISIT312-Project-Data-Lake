@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ISIT312 data lake: Spark's view of Hive. Spark does not open the Derby database itself;
+     it talks to the Hive metastore SERVICE (started by `lakectl start-hive`), the same one
+     HiveServer2/Beeline use, so both see the same databases and tables. -->
+<configuration>
+  <property>
+    <name>hive.metastore.uris</name>
+    <value>thrift://localhost:9083</value>
+  </property>
+  <property>
+    <name>hive.metastore.warehouse.dir</name>
+    <value>/user/hive/warehouse</value>
+  </property>
+</configuration>
