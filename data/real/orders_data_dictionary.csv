@@ -1,0 +1,96 @@
+position,column,label_ru,meaning_en,basis,filled_rows,total_rows
+1,COD_CL,клиент,client id,given,851,851
+2,OP_PRN,оператор,operator / intake account that accepted the order,given,851,851
+3,OP_OTP,оператор отправил,operator that dispatched it (1000 = automatic dispatch),given,851,851
+4,COD_DRV,Водитель,driver id,given,715,851
+5,COD_CAR,,vehicle id (empty in extract),inferred,0,851
+6,EADDR_FRM,начальный адрес,pickup address id,given,851,851
+7,EADDR_TO,конечный адрес,destination address id,given,851,851
+8,OADDR_FRM,,not interpreted (empty or constant in the extract),,0,851
+9,OADDR_TO,,not interpreted (empty or constant in the extract),,0,851
+10,PAY,стоимость,"final price, RUB",given,851,851
+11,D_PZAKAZ,дата принятия,time the order was accepted,given,851,851
+12,D_VZAKAZ,дата заказа,requested pickup time (later than acceptance = pre-order),given,851,851
+13,D_SPARKA,забрал,time the client was picked up,given,628,851
+14,D_VPRIB,прибыл,time the driver arrived at pickup,given,657,851
+15,D_VIPOL,выполнил,time the order was completed,given,631,851
+16,D_BUSY,назначен,time a driver was assigned,given,757,851
+17,D_NOANSW,,not interpreted (empty or constant in the extract),,0,851
+18,STATUS,,order status code,inferred,851,851
+19,COD_ROUTE,,not interpreted (empty or constant in the extract),,0,851
+20,ZAKAZ_INFO,доп инфо,free-text comment (reduced to a category here),given,349,851
+21,D_PODZVON,,not interpreted (empty or constant in the extract),,0,851
+22,EADDR_1,промежуточный адрес 1,intermediate stop 1 (address id),given,22,851
+23,EADDR_2,промежуточный адрес 1,intermediate stop 2 (address id),given,4,851
+24,EADDR_3,промежуточный адрес 1,intermediate stop 3 (address id),given,2,851
+25,EADDR_4,промежуточный адрес 1,intermediate stop 4 (address id),given,1,851
+26,EADDR_5,промежуточный адрес 1,intermediate stop 5 (address id),given,1,851
+27,EADDR_6,промежуточный адрес 1,intermediate stop 6 (address id),given,1,851
+28,EADDR_7,промежуточный адрес 1,intermediate stop 7 (address id),given,1,851
+29,EADDR_8,промежуточный адрес 1,intermediate stop 8 (address id),given,1,851
+30,BEZNAL,безнал,1 = non-cash corporate account,given,851,851
+31,WAITE_PAY,стоимость ожидания,paid waiting amount,given,851,851
+32,CHANNEL,,intake line code,inferred,851,851
+33,CID_TEL,номер клиента,not interpreted (empty or constant in the extract),,0,851
+34,CART,,service / tariff class,inferred,851,851
+35,COD_AKC,,not interpreted (empty or constant in the extract),,6,851
+36,WAVF,Запись звонка,link to the call recording,given,589,851
+37,PLAN_ID,,not interpreted (empty or constant in the extract),,0,851
+38,ORDER_ID,номер заказа,order number,given,851,851
+39,TENDER_NUM,,not interpreted (empty or constant in the extract),,0,851
+40,PODEZD,подъезд,"building entrance, typed by the operator",given,411,851
+41,REAZON,,cancellation reason code,inferred,220,851
+42,CNT_RETR,,not interpreted (empty or constant in the extract),,851,851
+43,D_VZYAL,,time the driver took the order,inferred,727,851
+44,DS_STATUS,,time of last driver status change,inferred,827,851
+45,NOTIFY,,1 = client was notified automatically,inferred,851,851
+46,CMNT,,intake line letter,inferred,851,851
+47,DISTANCE,длина маршрута,"route length, km",given,851,851
+48,D_INFORM,,time the client was informed that the car arrived,inferred,443,851
+49,DRV_PODACHA,,not interpreted (empty or constant in the extract),,0,851
+50,PODACHA,,"promised arrival time, minutes",inferred,851,851
+51,D_STARTWAIT,,time waiting started,inferred,673,851
+52,D_CL_ACK,,not interpreted (empty or constant in the extract),,0,851
+53,CNT_CL_ACK,,not interpreted (empty or constant in the extract),,851,851
+54,D_DRV_PODACHA,,time the arrival estimate was given,inferred,851,851
+55,D_CALL_TRY,,not interpreted (empty or constant in the extract),,0,851
+56,D_OPAZD,,time the car was flagged late,inferred,49,851
+57,ORDER_LIMIT_MASK,доп условия,extra requirements bit mask,given,851,851
+58,DO_PROPOSE,,1 = order was offered to drivers automatically,inferred,851,851
+59,DRV_NEAR,,not interpreted (empty or constant in the extract),,851,851
+60,BONUS,,not interpreted (empty or constant in the extract),,851,851
+61,REZERV_COD_DRV,,reserve driver id,inferred,23,851
+62,MEJGOROD,,1 = intercity order,inferred,851,851
+63,D_PAYSMS,,time the payment SMS / receipt was sent,inferred,77,851
+64,S_CHANNEL,,intake line code at creation,inferred,851,851
+65,D_WAIT,,not interpreted (empty or constant in the extract),,0,851
+66,C_WAIT,,not interpreted (empty or constant in the extract),,0,851
+67,D_POCHAS,,not interpreted (empty or constant in the extract),,0,851
+68,POCHAS,,not interpreted (empty or constant in the extract),,851,851
+69,S_PAY,начальная стоимость,"initial quoted price, RUB",given,851,851
+70,ZAKAZ_NARYAD,,not interpreted (empty or constant in the extract),,851,851
+71,NETOCH_ADDR_ID,,not interpreted (empty or constant in the extract),,591,851
+72,DRV_MEJGOROD,,not interpreted (empty or constant in the extract),,0,851
+73,DRV_WAIT_MIN,,not interpreted (empty or constant in the extract),,0,851
+74,IS_TAXOMETR,,not interpreted (empty or constant in the extract),,851,851
+75,SHOW_TEL,,not interpreted (empty or constant in the extract),,0,851
+76,AA_ORD,,automatic assignment round,inferred,372,851
+77,OPERATOR_INFO,,not interpreted (empty or constant in the extract),,0,851
+78,WTX_A_ID,,not interpreted (empty or constant in the extract),,0,851
+79,WTX_P_ID,,not interpreted (empty or constant in the extract),,0,851
+80,WTX_DREADY,,not interpreted (empty or constant in the extract),,0,851
+81,STAVKA,,not interpreted (empty or constant in the extract),,0,851
+82,FREE_BONUS,,not interpreted (empty or constant in the extract),,817,851
+83,SHOW_IN_HISTORY,,not interpreted (empty or constant in the extract),,851,851
+84,ORD_PRIO,,not interpreted (empty or constant in the extract),,0,851
+85,CONTACT_PHONE,,contact phone (removed),inferred,1,851
+86,ADAPTED_ID,,not interpreted,,16,851
+87,EADDR_INFO_ID,,not interpreted (empty or constant in the extract),,1,851
+88,EADDR_COORDS,,not interpreted (empty or constant in the extract),,177,851
+89,EADDR_LAT,,pickup latitude sent by the mobile app,inferred,177,851
+90,EADDR_LON,,pickup longitude sent by the mobile app,inferred,177,851
+91,CHAT_CLIENT,,not interpreted (empty or constant in the extract),,0,851
+92,D_TORG,,not interpreted (empty or constant in the extract),,0,851
+93,CARD_PAYMENT,,1 = paid by bank card in the app,inferred,851,851
+94,EADDR_LAT_LAST,,not interpreted (empty or constant in the extract),,0,851
+95,EADDR_LON_LAST,,not interpreted (empty or constant in the extract),,0,851
