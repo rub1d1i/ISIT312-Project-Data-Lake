@@ -1,0 +1,33 @@
+# Adds HBase to an already-built isit312-hadoop image (Week 7 lab), without downloading Hadoop or Hive again.
+#   docker build -f Dockerfile.hbase -t isit312-hadoop:latest .
+ARG BASE=isit312-hadoop:before-lab6
+FROM ${BASE}
+
+USER root
+# start-hbase.sh starts its ZooKeeper (HQuorumPeer) over ssh to localhost, as on the VM,
+# so the container needs an ssh server (started by entrypoint.sh) and a key for bigdata.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssh-server openssh-client \
+ && mkdir -p /run/sshd
+# HBase 1.2.6 in /usr/share/hbase, as on the VM (pseudo-distributed: HMaster, HRegionServer, HQuorumPeer).
+ARG HBASE_VERSION=1.2.6
+ARG HBASE_SHA256=a0fbc22373a7f2d66648c6d9fe13477e689df50c8ee533eda962d4e8fa2185ea
+RUN curl -fSL --retry 3 -o /tmp/hbase.tgz https://archive.apache.org/dist/hbase/${HBASE_VERSION}/hbase-${HBASE_VERSION}-bin.tar.gz \
+ && echo "${HBASE_SHA256}  /tmp/hbase.tgz" | sha256sum -c - \
+ && tar -xzf /tmp/hbase.tgz -C /usr/share \
+ && mv /usr/share/hbase-${HBASE_VERSION} /usr/share/hbase \
+ && rm -rf /tmp/hbase.tgz /usr/share/hbase/docs \
+ && sed -i -e "s|^# export JAVA_HOME=.*|export JAVA_HOME=${JAVA_HOME}|" \
+           -e 's/^export HBASE_\(MASTER\|REGIONSERVER\)_OPTS=.*PermSize.*/# &/' /usr/share/hbase/conf/hbase-env.sh \
+ && chown -R bigdata:bigdata /usr/share/hbase
+ENV HBASE_HOME=/usr/share/hbase
+ENV PATH=$HBASE_HOME/bin:$PATH
+COPY --chown=bigdata:bigdata conf/hbase/hbase-site.xml $HBASE_HOME/conf/
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+USER bigdata
+WORKDIR /home/bigdata
+RUN mkdir -p .ssh && ssh-keygen -q -t rsa -N '' -f .ssh/id_rsa \
+ && cp .ssh/id_rsa.pub .ssh/authorized_keys \
+ && printf 'Host localhost 127.0.0.1 0.0.0.0 bigdata-VirtualBox\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  LogLevel ERROR\n' > .ssh/config \
+ && chmod 700 .ssh && chmod 600 .ssh/authorized_keys .ssh/config

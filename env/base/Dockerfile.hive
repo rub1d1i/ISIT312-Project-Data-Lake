@@ -1,0 +1,25 @@
+# Adds Hive to an already-built isit312-hadoop image. These are the same Hive steps as in Dockerfile,
+# so the result matches a full build without downloading Hadoop again.
+#   docker build -f Dockerfile.hive -t isit312-hadoop:latest .
+ARG BASE=isit312-hadoop:before-lab4
+FROM ${BASE}
+
+USER root
+# Week 5 lab: Hive in /usr/share/hive, as on the VM, with its Derby metastore in /usr/share/hive/metastore_db.
+ARG HIVE_VERSION=2.3.9
+ARG HIVE_SHA256=1996327c96672e7ea8eaa8fc63972c75bc095287a32612e545e0e51c1622cb5c
+RUN curl -fSL --retry 3 -o /tmp/hive.tgz https://archive.apache.org/dist/hive/hive-${HIVE_VERSION}/apache-hive-${HIVE_VERSION}-bin.tar.gz \
+ && echo "${HIVE_SHA256}  /tmp/hive.tgz" | sha256sum -c - \
+ && tar -xzf /tmp/hive.tgz -C /usr/share \
+ && mv /usr/share/apache-hive-${HIVE_VERSION}-bin /usr/share/hive \
+ && rm -f /tmp/hive.tgz \
+ && chown -R bigdata:bigdata /usr/share/hive
+ENV HIVE_HOME=/usr/share/hive \
+    HIVE_CONF_DIR=/usr/share/hive/conf
+ENV PATH=$HIVE_HOME/bin:$PATH
+COPY --chown=bigdata:bigdata conf/hive/hive-site.xml $HIVE_CONF_DIR/
+
+USER bigdata
+WORKDIR /home/bigdata
+# Create the empty Hive metastore (the VM ships with it already initialised).
+RUN cd $HIVE_HOME && schematool -dbType derby -initSchema && rm -f derby.log
