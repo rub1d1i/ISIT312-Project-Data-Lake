@@ -1,0 +1,86 @@
+bigdata@datalake:~$ bash project/pipelines/hbase/03_position_history.sh
+== 1. table
+0 row(s) in 2.1530 seconds
+Hbase::Table - fleet:position_history
+== 2. export from Hive and bulk load
+26/11/19 18:19:10 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:19:30,245 INFO  [main] mapreduce.Job: Job job_1795110592923_0073 completed successfully
+		Map input records=108949
+		Bad Lines=0
+== 3. track of one completed order (real extract, branch A)
+order 76834132, driver 0012349, picked up 202611160921, completed 202611160929
+ROW                   COLUMN+CELL                                               
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.927095    
+ 21|508976010                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.95784     
+ 21|508976010                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=8.3    
+ 21|508976010                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.927082    
+ 22|508976278                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.957925    
+ 22|508976278                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=0.0    
+ 22|508976278                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.927082    
+ 23|508976555                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.957925    
+ 23|508976555                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=0.0    
+ 23|508976555                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.927082    
+ 24|508976842                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.957925    
+ 24|508976842                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=0.0    
+ 24|508976842                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.928488    
+ 25|508977114                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.970703    
+ 25|508977114                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=0.0    
+ 25|508977114                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.929028    
+ 25|508977193                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.971365    
+ 25|508977193                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=41.1   
+ 25|508977193                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.930663    
+ 26|508977300                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.973383    
+ 26|508977300                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=14.6   
+ 26|508977300                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.93194     
+ 26|508977407                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.974942    
+ 26|508977407                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=42.2   
+ 26|508977407                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.933882    
+ 27|508977691                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.977367    
+ 27|508977691                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=41.1   
+ 27|508977691                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.937343    
+ 28|508977975                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.981673    
+ 28|508977975                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=0.0    
+ 28|508977975                                                                   
+ A|0012349|2026111609 column=p:lat, timestamp=1795112362526, value=55.937765    
+ 29|508978270                                                                   
+ A|0012349|2026111609 column=p:lon, timestamp=1795112362526, value=47.983007    
+ 29|508978270                                                                   
+ A|0012349|2026111609 column=p:speed_kmh, timestamp=1795112362526, value=0.3    
+ 29|508978270                                                                   
+11 row(s) in 0.0920 seconds
+26/11/19 18:19:46 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+[wall-clock time of the command: 42 s]

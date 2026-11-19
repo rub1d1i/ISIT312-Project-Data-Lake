@@ -1,0 +1,40 @@
+bigdata@datalake:~$ bash project/pipelines/hbase/02_load_recordings.sh
+== 1. export the index from Hive
+26/11/19 18:18:31 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+26/11/19 18:18:43 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+A|76833592|0082cfc6a39cc2	0082cfc6a39cc2.wav	/lake/curated/media/recordings_packed/branch=A/dt=2026-11-16/recordings.seq	87	42.0	672044	2741	2026-11-16 05:04:00
+A|76833717|017fa81baa515c	017fa81baa515c.wav	/lake/curated/media/recordings_packed/branch=A/dt=2026-11-16/recordings.seq	672162	48.0	768044	2741	2026-11-16 06:42:00
+== 2. ImportTsv
+2026-11-19 18:18:50,236 INFO  [main] mapreduce.Job: Job job_1795110592923_0071 completed successfully
+		Map input records=240
+		Map output records=240
+		Bad Lines=0
+== 3. look-up by order
+26/11/19 18:18:50 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+240 row(s) in 0.0820 seconds
+240
+ROW                   COLUMN+CELL                                               
+ A|76833592|0082cfc6a column=r:call_ts, timestamp=1795112323641, value=2026-11-1
+ 39cc2                6 05:04:00                                                
+ A|76833592|0082cfc6a column=r:duration_s, timestamp=1795112323641, value=42.0  
+ 39cc2                                                                          
+ A|76833592|0082cfc6a column=r:file, timestamp=1795112323641, value=0082cfc6a39c
+ 39cc2                c2.wav                                                    
+ A|76833592|0082cfc6a column=r:offset, timestamp=1795112323641, value=87        
+ 39cc2                                                                          
+ A|76833592|0082cfc6a column=r:op_id, timestamp=1795112323641, value=2741       
+ 39cc2                                                                          
+ A|76833592|0082cfc6a column=r:size_bytes, timestamp=1795112323641, value=672044
+ 39cc2                                                                          
+ A|76833592|0082cfc6a column=r:stored_in, timestamp=1795112323641, value=/lake/c
+ 39cc2                urated/media/recordings_packed/branch=A/dt=2026-11-16/reco
+                      rdings.seq                                                
+1 row(s) in 0.0100 seconds
+nil
+26/11/19 18:18:53 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+[wall-clock time of the command: 22 s]

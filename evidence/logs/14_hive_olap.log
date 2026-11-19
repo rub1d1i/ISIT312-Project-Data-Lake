@@ -1,0 +1,796 @@
+bigdata@datalake:~$ beeline --color=false -u jdbc:hive2://localhost:10000 -n bigdata -f project/pipelines/hive/04_olap_queries.hql
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> -- Analytical (OLAP) queries on the warehouse. Each one answers a question the
+0: jdbc:hive2://localhost:10000> -- company asks today by exporting data and assembling the report by hand.
+0: jdbc:hive2://localhost:10000> -- Run: beeline -u jdbc:hive2://localhost:10000 -n bigdata -f 04_olap_queries.hql
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> USE dw;
+No rows affected (0.026 seconds)
+0: jdbc:hive2://localhost:10000> SET hive.auto.convert.join=true;
+No rows affected (0.006 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q1  ROLLUP: revenue and completed orders by city, month and service line,
+0: jdbc:hive2://localhost:10000> --     with subtotals per month, per city and a grand total (monthly management report).
+0: jdbc:hive2://localhost:10000> SELECT b.city_label, d.year_month, s.service_line,
+. . . . . . . . . . . . . . . .>        SUM(f.order_count)            AS orders,
+. . . . . . . . . . . . . . . .>        SUM(IF(o.outcome_name = 'COMPLETED', 1, 0)) AS completed,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(f.fare_amount), 0)  AS revenue_rub
+. . . . . . . . . . . . . . . .> FROM fact_orders f
+. . . . . . . . . . . . . . . .> JOIN dim_branch b  ON f.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .> JOIN dim_date d    ON f.date_key = d.date_key
+. . . . . . . . . . . . . . . .> JOIN dim_service s ON f.service_key = s.service_key
+. . . . . . . . . . . . . . . .> JOIN dim_outcome o ON f.outcome_key = o.outcome_key
+. . . . . . . . . . . . . . . .> GROUP BY b.city_label, d.year_month, s.service_line WITH ROLLUP
+. . . . . . . . . . . . . . . .> ORDER BY b.city_label, d.year_month, s.service_line;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:07:52	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:07:53	Dump the side-table for tag: 1 with group count: 5 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-07-50_564_3663105069874367667-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile01--.hashtable
+2026-11-19 18:07:53	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-07-50_564_3663105069874367667-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile01--.hashtable (449 bytes)
+2026-11-19 18:07:53	Dump the side-table for tag: 1 with group count: 8 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-07-50_564_3663105069874367667-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile11--.hashtable
+2026-11-19 18:07:53	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-07-50_564_3663105069874367667-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile11--.hashtable (476 bytes)
+2026-11-19 18:07:53	Dump the side-table for tag: 1 with group count: 47 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-07-50_564_3663105069874367667-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile21--.hashtable
+2026-11-19 18:07:53	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-07-50_564_3663105069874367667-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile21--.hashtable (1725 bytes)
+2026-11-19 18:07:53	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-07-50_564_3663105069874367667-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile31--.hashtable
+2026-11-19 18:07:53	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-07-50_564_3663105069874367667-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile31--.hashtable (312 bytes)
+2026-11-19 18:07:53	End of local task; Time Taken: 0.727 sec.
++---------------+---------------+-----------------+---------+------------+--------------+
+| b.city_label  | d.year_month  | s.service_line  | orders  | completed  | revenue_rub  |
++---------------+---------------+-----------------+---------+------------+--------------+
+| NULL          | NULL          | NULL            | 220547  | 167572     | 171831392    |
+| City A        | NULL          | NULL            | 142096  | 107979     | 118619394    |
+| City A        | 2026-10       | NULL            | 96512   | 73514      | 80863557     |
+| City A        | 2026-10       | CARGO           | 4632    | 3740       | 12992300     |
+| City A        | 2026-10       | PASSENGER       | 90943   | 69032      | 64788524     |
+| City A        | 2026-10       | SPECIAL         | 937     | 742        | 3082733      |
+| City A        | 2026-11       | NULL            | 45584   | 34465      | 37755837     |
+| City A        | 2026-11       | CARGO           | 2166    | 1745       | 5955693      |
+| City A        | 2026-11       | PASSENGER       | 42979   | 32371      | 30321784     |
+| City A        | 2026-11       | SPECIAL         | 439     | 349        | 1478359      |
+| City B        | NULL          | NULL            | 78451   | 59593      | 53211998     |
+| City B        | 2026-10       | NULL            | 53137   | 40432      | 35941120     |
+| City B        | 2026-10       | CARGO           | 2589    | 2094       | 6071762      |
+| City B        | 2026-10       | PASSENGER       | 50031   | 37930      | 28312366     |
+| City B        | 2026-10       | SPECIAL         | 517     | 408        | 1556993      |
+| City B        | 2026-11       | NULL            | 25314   | 19161      | 17270878     |
+| City B        | 2026-11       | CARGO           | 1213    | 966        | 2912302      |
+| City B        | 2026-11       | PASSENGER       | 23859   | 18003      | 13624152     |
+| City B        | 2026-11       | SPECIAL         | 242     | 192        | 734423       |
++---------------+---------------+-----------------+---------+------------+--------------+
+19 rows selected (26.716 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q2  CUBE: where are orders lost? Every combination of intake channel and outcome group.
+0: jdbc:hive2://localhost:10000> SELECT c.channel_name, o.outcome_group, SUM(f.order_count) AS orders
+. . . . . . . . . . . . . . . .> FROM fact_orders f
+. . . . . . . . . . . . . . . .> JOIN dim_channel c ON f.channel_key = c.channel_key
+. . . . . . . . . . . . . . . .> JOIN dim_outcome o ON f.outcome_key = o.outcome_key
+. . . . . . . . . . . . . . . .> GROUP BY c.channel_name, o.outcome_group WITH CUBE
+. . . . . . . . . . . . . . . .> ORDER BY c.channel_name, o.outcome_group;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:08:18	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:08:19	Dump the side-table for tag: 1 with group count: 5 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-08-17_290_1834875058670761408-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile41--.hashtable
+2026-11-19 18:08:19	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-08-17_290_1834875058670761408-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile41--.hashtable (413 bytes)
+2026-11-19 18:08:19	Dump the side-table for tag: 1 with group count: 4 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-08-17_290_1834875058670761408-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile51--.hashtable
+2026-11-19 18:08:19	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-08-17_290_1834875058670761408-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile51--.hashtable (384 bytes)
+2026-11-19 18:08:19	End of local task; Time Taken: 0.617 sec.
++-------------------+------------------+---------+
+|  c.channel_name   | o.outcome_group  | orders  |
++-------------------+------------------+---------+
+| NULL              | NULL             | 220547  |
+| NULL              | CANCELLED        | 45357   |
+| NULL              | FULFILLED        | 167572  |
+| NULL              | NOT_FULFILLED    | 7618    |
+| CALL_CENTRE       | NULL             | 146734  |
+| CALL_CENTRE       | CANCELLED        | 22989   |
+| CALL_CENTRE       | FULFILLED        | 117376  |
+| CALL_CENTRE       | NOT_FULFILLED    | 6369    |
+| CORPORATE_PORTAL  | NULL             | 19315   |
+| CORPORATE_PORTAL  | CANCELLED        | 1597    |
+| CORPORATE_PORTAL  | FULFILLED        | 17278   |
+| CORPORATE_PORTAL  | NOT_FULFILLED    | 440     |
+| MOBILE_APP        | NULL             | 44316   |
+| MOBILE_APP        | CANCELLED        | 17641   |
+| MOBILE_APP        | FULFILLED        | 26049   |
+| MOBILE_APP        | NOT_FULFILLED    | 626     |
+| WEBSITE           | NULL             | 10182   |
+| WEBSITE           | CANCELLED        | 3130    |
+| WEBSITE           | FULFILLED        | 6869    |
+| WEBSITE           | NOT_FULFILLED    | 183     |
++-------------------+------------------+---------+
+20 rows selected (25.962 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q3  GROUPING SETS: demand by city and part of day, by city only, and overall (demand planning).
+0: jdbc:hive2://localhost:10000> SELECT b.city_label, t.day_part, SUM(f.order_count) AS orders,
+. . . . . . . . . . . . . . . .>        ROUND(AVG(f.arrival_minutes), 1) AS avg_arrival_min
+. . . . . . . . . . . . . . . .> FROM fact_orders f
+. . . . . . . . . . . . . . . .> JOIN dim_branch b      ON f.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .> JOIN dim_time_of_day t ON f.hour_key = t.hour_key
+. . . . . . . . . . . . . . . .> GROUP BY b.city_label, t.day_part
+. . . . . . . . . . . . . . . .> GROUPING SETS ((b.city_label, t.day_part), (b.city_label), ())
+. . . . . . . . . . . . . . . .> ORDER BY b.city_label, t.day_part;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:08:44	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:08:45	Dump the side-table for tag: 1 with group count: 24 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-08-43_267_2263949301967693862-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile61--.hashtable
+2026-11-19 18:08:45	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-08-43_267_2263949301967693862-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile61--.hashtable (959 bytes)
+2026-11-19 18:08:45	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-08-43_267_2263949301967693862-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile71--.hashtable
+2026-11-19 18:08:45	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-08-43_267_2263949301967693862-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile71--.hashtable (312 bytes)
+2026-11-19 18:08:45	End of local task; Time Taken: 0.689 sec.
++---------------+---------------+---------+------------------+
+| b.city_label  |  t.day_part   | orders  | avg_arrival_min  |
++---------------+---------------+---------+------------------+
+| NULL          | NULL          | 220547  | 7.8              |
+| City A        | NULL          | 142096  | 7.8              |
+| City A        | DAYTIME       | 40442   | 7.8              |
+| City A        | EVENING_PEAK  | 36250   | 7.8              |
+| City A        | LATE_EVENING  | 20736   | 7.8              |
+| City A        | MORNING_PEAK  | 32903   | 7.7              |
+| City A        | NIGHT         | 11765   | 7.8              |
+| City B        | NULL          | 78451   | 7.8              |
+| City B        | DAYTIME       | 22333   | 7.7              |
+| City B        | EVENING_PEAK  | 19723   | 7.8              |
+| City B        | LATE_EVENING  | 11420   | 7.8              |
+| City B        | MORNING_PEAK  | 18290   | 7.7              |
+| City B        | NIGHT         | 6685    | 7.7              |
++---------------+---------------+---------+------------------+
+13 rows selected (24.678 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q4  Window functions: daily revenue per city with a 7-day moving average and the change against the previous day.
+0: jdbc:hive2://localhost:10000> SELECT city_label, full_date, revenue_rub,
+. . . . . . . . . . . . . . . .>        ROUND(AVG(revenue_rub) OVER (PARTITION BY city_label ORDER BY full_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 0) AS avg_7_days,
+. . . . . . . . . . . . . . . .>        revenue_rub - LAG(revenue_rub) OVER (PARTITION BY city_label ORDER BY full_date) AS change_vs_previous_day
+. . . . . . . . . . . . . . . .> FROM (
+. . . . . . . . . . . . . . . .>   SELECT b.city_label, d.full_date, ROUND(SUM(f.fare_amount), 0) AS revenue_rub
+. . . . . . . . . . . . . . . .>   FROM fact_orders f
+. . . . . . . . . . . . . . . .>   JOIN dim_branch b ON f.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .>   JOIN dim_date d   ON f.date_key = d.date_key
+. . . . . . . . . . . . . . . .>   WHERE f.order_month = '2026-11'
+. . . . . . . . . . . . . . . .>   GROUP BY b.city_label, d.full_date
+. . . . . . . . . . . . . . . .> ) daily
+. . . . . . . . . . . . . . . .> ORDER BY city_label, full_date;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:09:09	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:09:09	Dump the side-table for tag: 1 with group count: 47 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-09-07_960_121172873481645552-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile81--.hashtable
+2026-11-19 18:09:09	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-09-07_960_121172873481645552-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile81--.hashtable (1487 bytes)
+2026-11-19 18:09:09	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-09-07_960_121172873481645552-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile91--.hashtable
+2026-11-19 18:09:09	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-09-07_960_121172873481645552-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile91--.hashtable (312 bytes)
+2026-11-19 18:09:09	End of local task; Time Taken: 0.465 sec.
++-------------+-------------+--------------+-------------+-------------------------+
+| city_label  |  full_date  | revenue_rub  | avg_7_days  | change_vs_previous_day  |
++-------------+-------------+--------------+-------------+-------------------------+
+| City A      | 2026-11-01  | 1724181      | 1724181     | NULL                    |
+| City A      | 2026-11-02  | 2616731      | 2170456     | 892550                  |
+| City A      | 2026-11-03  | 2389885      | 2243599     | -226846                 |
+| City A      | 2026-11-04  | 4165096      | 2723973     | 1775211                 |
+| City A      | 2026-11-05  | 2373923      | 2653963     | -1791173                |
+| City A      | 2026-11-06  | 2823131      | 2682158     | 449208                  |
+| City A      | 2026-11-07  | 2234137      | 2618155     | -588994                 |
+| City A      | 2026-11-08  | 1859048      | 2637422     | -375089                 |
+| City A      | 2026-11-09  | 2641026      | 2640892     | 781978                  |
+| City A      | 2026-11-10  | 2275456      | 2624545     | -365570                 |
+| City A      | 2026-11-11  | 2238805      | 2349361     | -36651                  |
+| City A      | 2026-11-12  | 2679133      | 2392962     | 440328                  |
+| City A      | 2026-11-13  | 2922664      | 2407181     | 243531                  |
+| City A      | 2026-11-14  | 2586725      | 2457551     | -335939                 |
+| City A      | 2026-11-15  | 1882384      | 2460885     | -704341                 |
+| City A      | 2026-11-16  | 343511       | 2132668     | -1538873                |
+| City B      | 2026-11-01  | 772687       | 772687      | NULL                    |
+| City B      | 2026-11-02  | 1031858      | 902273      | 259171                  |
+| City B      | 2026-11-03  | 971887       | 925477      | -59971                  |
+| City B      | 2026-11-04  | 1891886      | 1167080     | 919999                  |
+| City B      | 2026-11-05  | 1067563      | 1147176     | -824323                 |
+| City B      | 2026-11-06  | 1539169      | 1212508     | 471606                  |
+| City B      | 2026-11-07  | 1116868      | 1198845     | -422301                 |
+| City B      | 2026-11-08  | 773710       | 1198992     | -343158                 |
+| City B      | 2026-11-09  | 1084567      | 1206521     | 310857                  |
+| City B      | 2026-11-10  | 1104474      | 1225462     | 19907                   |
+| City B      | 2026-11-11  | 1137595      | 1117707     | 33121                   |
+| City B      | 2026-11-12  | 1177085      | 1133353     | 39490                   |
+| City B      | 2026-11-13  | 1421586      | 1116555     | 244501                  |
+| City B      | 2026-11-14  | 1117925      | 1116706     | -303661                 |
+| City B      | 2026-11-15  | 786622       | 1118551     | -331303                 |
+| City B      | 2026-11-16  | 275397       | 1002955     | -511225                 |
++-------------+-------------+--------------+-------------+-------------------------+
+32 rows selected (27.019 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q5  RANK: the five busiest pickup zones of each city (where to station free cars).
+0: jdbc:hive2://localhost:10000> SELECT city_label, zone_code, zone_type, completed_orders, zone_rank
+. . . . . . . . . . . . . . . .> FROM (
+. . . . . . . . . . . . . . . .>   SELECT z.city_label, z.zone_code, z.zone_type, COUNT(*) AS completed_orders,
+. . . . . . . . . . . . . . . .>          RANK() OVER (PARTITION BY z.city_label ORDER BY COUNT(*) DESC) AS zone_rank
+. . . . . . . . . . . . . . . .>   FROM fact_orders f
+. . . . . . . . . . . . . . . .>   JOIN dim_zone z    ON f.pickup_zone_key = z.zone_key
+. . . . . . . . . . . . . . . .>   JOIN dim_outcome o ON f.outcome_key = o.outcome_key
+. . . . . . . . . . . . . . . .>   WHERE o.outcome_name = 'COMPLETED'
+. . . . . . . . . . . . . . . .>   GROUP BY z.city_label, z.zone_code, z.zone_type
+. . . . . . . . . . . . . . . .> ) ranked
+. . . . . . . . . . . . . . . .> WHERE zone_rank <= 5
+. . . . . . . . . . . . . . . .> ORDER BY city_label, zone_rank;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:09:36	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:09:37	Dump the side-table for tag: 1 with group count: 1 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-09-34_992_5911962498696539044-1/-local-10008/HashTable-Stage-3/MapJoin-mapfile101--.hashtable
+2026-11-19 18:09:37	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-09-34_992_5911962498696539044-1/-local-10008/HashTable-Stage-3/MapJoin-mapfile101--.hashtable (278 bytes)
+2026-11-19 18:09:37	Dump the side-table for tag: 1 with group count: 25 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-09-34_992_5911962498696539044-1/-local-10008/HashTable-Stage-3/MapJoin-mapfile111--.hashtable
+2026-11-19 18:09:37	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-09-34_992_5911962498696539044-1/-local-10008/HashTable-Stage-3/MapJoin-mapfile111--.hashtable (1308 bytes)
+2026-11-19 18:09:37	End of local task; Time Taken: 0.634 sec.
++-------------+------------+--------------+-------------------+------------+
+| city_label  | zone_code  |  zone_type   | completed_orders  | zone_rank  |
++-------------+------------+--------------+-------------------+------------+
+| City A      | A-M2       | CENTRE       | 28336             | 1          |
+| City A      | A-M3       | CENTRE       | 26348             | 2          |
+| City A      | A-S3       | RESIDENTIAL  | 10278             | 3          |
+| City A      | A-S2       | RESIDENTIAL  | 6178              | 4          |
+| City A      | A-S4       | SUBURB       | 5945              | 5          |
+| City B      | B-M2       | CENTRE       | 19508             | 1          |
+| City B      | B-M3       | CENTRE       | 14374             | 2          |
+| City B      | B-S3       | RESIDENTIAL  | 4497              | 3          |
+| City B      | B-N2       | RESIDENTIAL  | 3420              | 4          |
+| City B      | B-S2       | RESIDENTIAL  | 3277              | 5          |
++-------------+------------+--------------+-------------------+------------+
+10 rows selected (38.119 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q6  Drill-across two fact tables: orders against available driver time, hour by hour, on the day of the extract.
+0: jdbc:hive2://localhost:10000> SELECT o.city_label, o.hour_key, o.orders, o.completed, s.drivers_on_line, s.free_minutes, s.busy_minutes,
+. . . . . . . . . . . . . . . .>        ROUND(s.busy_minutes * 100.0 / (s.busy_minutes + s.free_minutes), 1) AS utilisation_pct
+. . . . . . . . . . . . . . . .> FROM (
+. . . . . . . . . . . . . . . .>   SELECT b.city_label, f.branch_key, f.hour_key, SUM(f.order_count) AS orders,
+. . . . . . . . . . . . . . . .>          SUM(IF(f.outcome_key = 1, 1, 0)) AS completed
+. . . . . . . . . . . . . . . .>   FROM fact_orders f JOIN dim_branch b ON f.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .>   WHERE f.date_key = 20261116
+. . . . . . . . . . . . . . . .>   GROUP BY b.city_label, f.branch_key, f.hour_key
+. . . . . . . . . . . . . . . .> ) o
+. . . . . . . . . . . . . . . .> JOIN (
+. . . . . . . . . . . . . . . .>   SELECT branch_key, hour_key, COUNT(DISTINCT driver_key) AS drivers_on_line,
+. . . . . . . . . . . . . . . .>          SUM(minutes_free) AS free_minutes, SUM(minutes_on_order) AS busy_minutes
+. . . . . . . . . . . . . . . .>   FROM fact_fleet_activity
+. . . . . . . . . . . . . . . .>   WHERE date_key = 20261116
+. . . . . . . . . . . . . . . .>   GROUP BY branch_key, hour_key
+. . . . . . . . . . . . . . . .> ) s ON o.branch_key = s.branch_key AND o.hour_key = s.hour_key
+. . . . . . . . . . . . . . . .> ORDER BY o.city_label, o.hour_key;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:10:28	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:10:28	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-10-13_135_673149384510417513-1/-local-10012/HashTable-Stage-2/MapJoin-mapfile141--.hashtable
+2026-11-19 18:10:28	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-10-13_135_673149384510417513-1/-local-10012/HashTable-Stage-2/MapJoin-mapfile141--.hashtable (312 bytes)
+2026-11-19 18:10:28	End of local task; Time Taken: 0.634 sec.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:10:41	Starting to launch local task to process map join;	maximum memory = 954728448
+2026-11-19 18:10:42	Dump the side-table for tag: 1 with group count: 22 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-10-13_135_673149384510417513-1/-local-10008/HashTable-Stage-7/MapJoin-mapfile121--.hashtable
+2026-11-19 18:10:42	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-10-13_135_673149384510417513-1/-local-10008/HashTable-Stage-7/MapJoin-mapfile121--.hashtable (869 bytes)
+2026-11-19 18:10:42	End of local task; Time Taken: 0.399 sec.
++---------------+-------------+-----------+--------------+--------------------+-----------------+-----------------+------------------+
+| o.city_label  | o.hour_key  | o.orders  | o.completed  | s.drivers_on_line  | s.free_minutes  | s.busy_minutes  | utilisation_pct  |
++---------------+-------------+-----------+--------------+--------------------+-----------------+-----------------+------------------+
+| City A        | 0           | 40        | 23           | 73                 | 2011            | 903             | 31.0             |
+| City A        | 1           | 32        | 17           | 53                 | 1575            | 682             | 30.2             |
+| City A        | 2           | 25        | 20           | 41                 | 1392            | 532             | 27.7             |
+| City A        | 3           | 30        | 23           | 40                 | 1103            | 932             | 45.8             |
+| City A        | 4           | 47        | 35           | 44                 | 1171            | 1041            | 47.1             |
+| City A        | 5           | 51        | 37           | 84                 | 1376            | 1352            | 49.6             |
+| City A        | 6           | 113       | 88           | 157                | 2199            | 2650            | 54.7             |
+| City A        | 7           | 160       | 122          | 215                | 3189            | 4423            | 58.1             |
+| City A        | 8           | 202       | 152          | 267                | 4737            | 5625            | 54.3             |
+| City A        | 9           | 142       | 109          | 295                | 6132            | 5851            | 48.8             |
+| City A        | 10          | 9         | 1            | 256                | 2242            | 2258            | 50.2             |
+| City B        | 0           | 26        | 18           | 33                 | 881             | 437             | 33.2             |
+| City B        | 1           | 19        | 14           | 48                 | 1732            | 356             | 17.0             |
+| City B        | 2           | 10        | 8            | 54                 | 1951            | 437             | 18.3             |
+| City B        | 3           | 13        | 10           | 58                 | 2297            | 322             | 12.3             |
+| City B        | 4           | 19        | 12           | 67                 | 2333            | 321             | 12.1             |
+| City B        | 5           | 28        | 19           | 93                 | 3310            | 415             | 11.1             |
+| City B        | 6           | 59        | 39           | 124                | 4184            | 1028            | 19.7             |
+| City B        | 7           | 74        | 53           | 159                | 5353            | 1454            | 21.4             |
+| City B        | 8           | 111       | 87           | 188                | 5503            | 2747            | 33.3             |
+| City B        | 9           | 78        | 60           | 169                | 5642            | 2429            | 30.1             |
+| City B        | 10          | 17        | 12           | 132                | 1736            | 732             | 29.7             |
++---------------+-------------+-----------+--------------+--------------------+-----------------+-----------------+------------------+
+22 rows selected (48.244 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q7  Slice + dice: is an order flagged "no car by the promised time" lost more often? Call-centre orders in November.
+0: jdbc:hive2://localhost:10000> SELECT b.city_label, IF(f.late_count = 1, 'NO CAR IN TIME', 'NOT FLAGGED') AS arrival, SUM(f.order_count) AS orders,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(IF(o.outcome_group = 'CANCELLED', 1, 0)) * 100.0 / SUM(f.order_count), 1) AS cancelled_pct
+. . . . . . . . . . . . . . . .> FROM fact_orders f
+. . . . . . . . . . . . . . . .> JOIN dim_branch b  ON f.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .> JOIN dim_channel c ON f.channel_key = c.channel_key
+. . . . . . . . . . . . . . . .> JOIN dim_outcome o ON f.outcome_key = o.outcome_key
+. . . . . . . . . . . . . . . .> WHERE f.order_month = '2026-11' AND c.channel_name = 'CALL_CENTRE'
+. . . . . . . . . . . . . . . .> GROUP BY b.city_label, IF(f.late_count = 1, 'NO CAR IN TIME', 'NOT FLAGGED')
+. . . . . . . . . . . . . . . .> ORDER BY b.city_label, arrival;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:11:02	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:11:03	Dump the side-table for tag: 1 with group count: 5 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-01_388_7078895117311268730-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile151--.hashtable
+2026-11-19 18:11:03	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-01_388_7078895117311268730-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile151--.hashtable (413 bytes)
+2026-11-19 18:11:03	Dump the side-table for tag: 1 with group count: 1 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-01_388_7078895117311268730-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile161--.hashtable
+2026-11-19 18:11:03	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-01_388_7078895117311268730-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile161--.hashtable (278 bytes)
+2026-11-19 18:11:03	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-01_388_7078895117311268730-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile171--.hashtable
+2026-11-19 18:11:03	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-01_388_7078895117311268730-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile171--.hashtable (312 bytes)
+2026-11-19 18:11:03	End of local task; Time Taken: 0.624 sec.
++---------------+-----------------+---------+----------------+
+| b.city_label  |     arrival     | orders  | cancelled_pct  |
++---------------+-----------------+---------+----------------+
+| City A        | NO CAR IN TIME  | 4272    | 20.9           |
+| City A        | NOT FLAGGED     | 25845   | 15.2           |
+| City B        | NO CAR IN TIME  | 2369    | 20.9           |
+| City B        | NOT FLAGGED     | 14414   | 15.0           |
++---------------+-----------------+---------+----------------+
+4 rows selected (26.814 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q8  Call-centre load: calls, share answered and queue wait per part of day (uses the calls fact).
+0: jdbc:hive2://localhost:10000> SELECT b.city_label, t.day_part, SUM(c.call_count) AS calls,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(c.answered_count) * 100.0 / SUM(c.call_count), 1) AS answered_pct,
+. . . . . . . . . . . . . . . .>        ROUND(AVG(c.queue_wait_seconds), 1) AS avg_queue_wait_s,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(c.talk_seconds) / 3600.0, 0) AS talk_hours
+. . . . . . . . . . . . . . . .> FROM fact_calls c
+. . . . . . . . . . . . . . . .> JOIN dim_branch b      ON c.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .> JOIN dim_time_of_day t ON c.hour_key = t.hour_key
+. . . . . . . . . . . . . . . .> WHERE c.call_type IN ('ORDER_INTAKE', 'STATUS_INQUIRY', 'COMPLAINT')
+. . . . . . . . . . . . . . . .> GROUP BY b.city_label, t.day_part
+. . . . . . . . . . . . . . . .> ORDER BY b.city_label, t.day_part;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:11:29	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:11:30	Dump the side-table for tag: 1 with group count: 24 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-28_220_4588555383481156349-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile181--.hashtable
+2026-11-19 18:11:30	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-28_220_4588555383481156349-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile181--.hashtable (959 bytes)
+2026-11-19 18:11:30	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-28_220_4588555383481156349-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile191--.hashtable
+2026-11-19 18:11:30	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-28_220_4588555383481156349-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile191--.hashtable (312 bytes)
+2026-11-19 18:11:30	End of local task; Time Taken: 0.625 sec.
++---------------+---------------+--------+---------------+-------------------+-------------+
+| b.city_label  |  t.day_part   | calls  | answered_pct  | avg_queue_wait_s  | talk_hours  |
++---------------+---------------+--------+---------------+-------------------+-------------+
+| City A        | DAYTIME       | 68431  | 91.8          | 8.5               | 698         |
+| City A        | EVENING_PEAK  | 61421  | 91.9          | 8.5               | 630         |
+| City A        | LATE_EVENING  | 37823  | 92.4          | 8.4               | 392         |
+| City A        | MORNING_PEAK  | 55828  | 92.1          | 8.5               | 573         |
+| City A        | NIGHT         | 20642  | 91.8          | 8.5               | 212         |
+| City B        | DAYTIME       | 37975  | 91.7          | 8.4               | 388         |
+| City B        | EVENING_PEAK  | 33741  | 91.9          | 8.4               | 344         |
+| City B        | LATE_EVENING  | 20648  | 92.2          | 8.5               | 216         |
+| City B        | MORNING_PEAK  | 31321  | 92.1          | 8.4               | 322         |
+| City B        | NIGHT         | 11767  | 92.0          | 8.4               | 122         |
++---------------+---------------+--------+---------------+-------------------+-------------+
+10 rows selected (24.924 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q9  Pricing against the market (drill-across to the market fact): the company's own quote for a
+0: jdbc:hive2://localhost:10000> --     standard trip of about 8 km next to the competitors' 8 km price and the traffic index, by part of day.
+0: jdbc:hive2://localhost:10000> SELECT b.city_label, t.day_part, SUM(o.trips) AS own_trips,
+. . . . . . . . . . . . . . . .>        ROUND(AVG(o.own_quote), 0) AS own_quote_8km, ROUND(AVG(m.competitor_price_8km), 0) AS competitor_8km,
+. . . . . . . . . . . . . . . .>        ROUND(AVG(o.own_quote) * 100.0 / AVG(m.competitor_price_8km) - 100, 1) AS own_vs_competitor_pct,
+. . . . . . . . . . . . . . . .>        ROUND(AVG(m.traffic_index), 1) AS traffic_index
+. . . . . . . . . . . . . . . .> FROM (
+. . . . . . . . . . . . . . . .>   SELECT date_key, hour_key, branch_key, AVG(quoted_amount) AS own_quote, COUNT(*) AS trips
+. . . . . . . . . . . . . . . .>   FROM fact_orders
+. . . . . . . . . . . . . . . .>   WHERE order_month = '2026-11' AND service_key = 1 AND distance_km BETWEEN 7 AND 9
+. . . . . . . . . . . . . . . .>   GROUP BY date_key, hour_key, branch_key
+. . . . . . . . . . . . . . . .> ) o
+. . . . . . . . . . . . . . . .> JOIN fact_market_hourly m ON o.date_key = m.date_key AND o.hour_key = m.hour_key AND o.branch_key = m.branch_key
+. . . . . . . . . . . . . . . .> JOIN dim_branch b      ON o.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .> JOIN dim_time_of_day t ON o.hour_key = t.hour_key
+. . . . . . . . . . . . . . . .> GROUP BY b.city_label, t.day_part
+. . . . . . . . . . . . . . . .> ORDER BY b.city_label, t.day_part;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:12:06	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:12:07	Dump the side-table for tag: 1 with group count: 24 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-53_165_7232097769272864755-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile201--.hashtable
+2026-11-19 18:12:07	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-53_165_7232097769272864755-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile201--.hashtable (959 bytes)
+2026-11-19 18:12:07	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-53_165_7232097769272864755-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile211--.hashtable
+2026-11-19 18:12:07	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-53_165_7232097769272864755-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile211--.hashtable (312 bytes)
+2026-11-19 18:12:07	Dump the side-table for tag: 1 with group count: 2230 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-53_165_7232097769272864755-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile221--.hashtable
+2026-11-19 18:12:07	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-11-53_165_7232097769272864755-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile221--.hashtable (92138 bytes)
+2026-11-19 18:12:07	End of local task; Time Taken: 0.64 sec.
++---------------+---------------+------------+----------------+-----------------+------------------------+----------------+
+| b.city_label  |  t.day_part   | own_trips  | own_quote_8km  | competitor_8km  | own_vs_competitor_pct  | traffic_index  |
++---------------+---------------+------------+----------------+-----------------+------------------------+----------------+
+| City A        | DAYTIME       | 1159       | 531            | 496.0           | 7.1                    | 4.0            |
+| City A        | EVENING_PEAK  | 1106       | 620            | 581.0           | 6.7                    | 6.7            |
+| City A        | LATE_EVENING  | 662        | 525            | 497.0           | 5.6                    | 3.9            |
+| City A        | MORNING_PEAK  | 1056       | 605            | 570.0           | 6.2                    | 6.2            |
+| City A        | NIGHT         | 389        | 474            | 447.0           | 6.0                    | 1.9            |
+| City B        | DAYTIME       | 919        | 529            | 494.0           | 7.2                    | 3.0            |
+| City B        | EVENING_PEAK  | 867        | 626            | 580.0           | 7.9                    | 5.0            |
+| City B        | LATE_EVENING  | 492        | 525            | 498.0           | 5.4                    | 3.0            |
+| City B        | MORNING_PEAK  | 879        | 609            | 572.0           | 6.5                    | 4.6            |
+| City B        | NIGHT         | 294        | 477            | 447.0           | 6.7                    | 1.6            |
++---------------+---------------+------------+----------------+-----------------+------------------------+----------------+
+10 rows selected (40.369 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q10 Budget view from the accounting export (ledger fact), ROLLUP: revenue and cost groups per city and
+0: jdbc:hive2://localhost:10000> --     month; the subtotal row of a month is its result.
+0: jdbc:hive2://localhost:10000> SELECT b.city_label, d.year_month, i.item_group, ROUND(SUM(l.amount), 0) AS amount_rub
+. . . . . . . . . . . . . . . .> FROM fact_ledger l
+. . . . . . . . . . . . . . . .> JOIN dim_branch b      ON l.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .> JOIN dim_date d        ON l.date_key = d.date_key
+. . . . . . . . . . . . . . . .> JOIN dim_ledger_item i ON l.ledger_item_key = i.ledger_item_key
+. . . . . . . . . . . . . . . .> GROUP BY b.city_label, d.year_month, i.item_group WITH ROLLUP
+. . . . . . . . . . . . . . . .> ORDER BY b.city_label, d.year_month, i.item_group;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:12:35	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:12:35	Dump the side-table for tag: 1 with group count: 13 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-12-33_546_1411426717764586776-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile231--.hashtable
+2026-11-19 18:12:35	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-12-33_546_1411426717764586776-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile231--.hashtable (690 bytes)
+2026-11-19 18:12:35	Dump the side-table for tag: 1 with group count: 47 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-12-33_546_1411426717764586776-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile241--.hashtable
+2026-11-19 18:12:35	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-12-33_546_1411426717764586776-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile241--.hashtable (1725 bytes)
+2026-11-19 18:12:35	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-12-33_546_1411426717764586776-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile251--.hashtable
+2026-11-19 18:12:35	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-12-33_546_1411426717764586776-1/-local-10008/HashTable-Stage-4/MapJoin-mapfile251--.hashtable (312 bytes)
+2026-11-19 18:12:35	End of local task; Time Taken: 0.651 sec.
++---------------+---------------+--------------------+-------------+
+| b.city_label  | d.year_month  |    i.item_group    | amount_rub  |
++---------------+---------------+--------------------+-------------+
+| NULL          | NULL          | NULL               | 41197960    |
+| City A        | NULL          | NULL               | 29567976    |
+| City A        | 2026-10       | NULL               | 20148460    |
+| City A        | 2026-10       | ADMIN_AND_PAYROLL  | -2764291    |
+| City A        | 2026-10       | DRIVER_PAYOUTS     | -54524981   |
+| City A        | 2026-10       | FLEET_COSTS        | -2697193    |
+| City A        | 2026-10       | IT_AND_TELECOM     | -728633     |
+| City A        | 2026-10       | REVENUE            | 80863557    |
+| City A        | 2026-11       | NULL               | 9419516     |
+| City A        | 2026-11       | ADMIN_AND_PAYROLL  | -1339578    |
+| City A        | 2026-11       | DRIVER_PAYOUTS     | -25312500   |
+| City A        | 2026-11       | FLEET_COSTS        | -1316430    |
+| City A        | 2026-11       | IT_AND_TELECOM     | -366613     |
+| City A        | 2026-11       | REVENUE            | 37754637    |
+| City B        | NULL          | NULL               | 11629984    |
+| City B        | 2026-10       | NULL               | 7895799     |
+| City B        | 2026-10       | ADMIN_AND_PAYROLL  | -1339163    |
+| City B        | 2026-10       | DRIVER_PAYOUTS     | -24605996   |
+| City B        | 2026-10       | FLEET_COSTS        | -1648357    |
+| City B        | 2026-10       | IT_AND_TELECOM     | -451805     |
+| City B        | 2026-10       | REVENUE            | 35941120    |
+| City B        | 2026-11       | NULL               | 3734184     |
+| City B        | 2026-11       | ADMIN_AND_PAYROLL  | -679339     |
+| City B        | 2026-11       | DRIVER_PAYOUTS     | -11826227   |
+| City B        | 2026-11       | FLEET_COSTS        | -808011     |
+| City B        | 2026-11       | IT_AND_TELECOM     | -223116     |
+| City B        | 2026-11       | REVENUE            | 17270878    |
++---------------+---------------+--------------------+-------------+
+27 rows selected (26.514 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q11 What the company keeps: gross fares against the company's own revenue, own fleet and contractors.
+0: jdbc:hive2://localhost:10000> SELECT b.city_label, dr.employment_type, SUM(f.order_count) AS trips,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(f.fare_amount), 0) AS gross_fares, ROUND(SUM(f.company_revenue), 0) AS company_revenue,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(f.company_revenue) * 100.0 / SUM(f.fare_amount), 1) AS kept_pct
+. . . . . . . . . . . . . . . .> FROM fact_orders f
+. . . . . . . . . . . . . . . .> JOIN dim_branch b  ON f.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .> JOIN dim_driver dr ON f.driver_key = dr.driver_key
+. . . . . . . . . . . . . . . .> WHERE f.outcome_key = 1
+. . . . . . . . . . . . . . . .> GROUP BY b.city_label, dr.employment_type
+. . . . . . . . . . . . . . . .> ORDER BY b.city_label, dr.employment_type;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:13:01	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:13:02	Dump the side-table for tag: 1 with group count: 2502 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-00_076_8813759787434687221-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile261--.hashtable
+2026-11-19 18:13:02	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-00_076_8813759787434687221-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile261--.hashtable (80085 bytes)
+2026-11-19 18:13:02	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-00_076_8813759787434687221-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile271--.hashtable
+2026-11-19 18:13:02	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-00_076_8813759787434687221-1/-local-10007/HashTable-Stage-3/MapJoin-mapfile271--.hashtable (312 bytes)
+2026-11-19 18:13:02	End of local task; Time Taken: 0.638 sec.
++---------------+---------------------+--------+--------------+------------------+-----------+
+| b.city_label  | dr.employment_type  | trips  | gross_fares  | company_revenue  | kept_pct  |
++---------------+---------------------+--------+--------------+------------------+-----------+
+| City A        | CONTRACTOR          | 97610  | 99231252     | 19393772         | 19.5      |
+| City A        | OWN_FLEET           | 10368  | 19387442     | 19387442         | 100.0     |
+| City A        | UNKNOWN             | 1      | 700          | NULL             | NULL      |
+| City B        | CONTRACTOR          | 54050  | 45296265     | 8864041          | 19.6      |
+| City B        | OWN_FLEET           | 5543   | 7915733      | 7915733          | 100.0     |
++---------------+---------------------+--------+--------------+------------------+-----------+
+5 rows selected (26.948 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q12 Partition pruning: the plan reads only the folder branch_code=B/order_month=2026-11.
+0: jdbc:hive2://localhost:10000> EXPLAIN EXTENDED
+. . . . . . . . . . . . . . . .> SELECT COUNT(*) FROM fact_orders WHERE branch_code = 'B' AND order_month = '2026-11';
++----------------------------------------------------+
+|                      Explain                       |
++----------------------------------------------------+
+| STAGE DEPENDENCIES:                                |
+|   Stage-1 is a root stage                          |
+|   Stage-0 depends on stages: Stage-1               |
+|                                                    |
+| STAGE PLANS:                                       |
+|   Stage: Stage-1                                   |
+|     Map Reduce                                     |
+|       Map Operator Tree:                           |
+|           TableScan                                |
+|             alias: fact_orders                     |
+|             Statistics: Num rows: 1 Data size: 812845 Basic stats: PARTIAL Column stats: NONE |
+|             GatherStats: false                     |
+|             Select Operator                        |
+|               Statistics: Num rows: 1 Data size: 812845 Basic stats: PARTIAL Column stats: NONE |
+|               Group By Operator                    |
+|                 aggregations: count()              |
+|                 mode: hash                         |
+|                 outputColumnNames: _col0           |
+|                 Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE |
+|                 Reduce Output Operator             |
+|                   null sort order:                 |
+|                   sort order:                      |
+|                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE |
+|                   tag: -1                          |
+|                   value expressions: _col0 (type: bigint) |
+|                   auto parallelism: false          |
+|       Path -> Alias:                               |
+|         hdfs://localhost:8020/lake/analytics/dw/fact_orders/branch_code=B/order_month=2026-11 [fact_orders] |
+|       Path -> Partition:                           |
+|         hdfs://localhost:8020/lake/analytics/dw/fact_orders/branch_code=B/order_month=2026-11  |
+|           Partition                                |
+|             base file name: order_month=2026-11    |
+|             input format: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat |
+|             output format: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat |
+|             partition values:                      |
+|               branch_code B                        |
+|               order_month 2026-11                  |
+|             properties:                            |
+|               bucket_count -1                      |
+|               column.name.delimiter ,              |
+|               columns date_key,hour_key,branch_key,pickup_zone_key,dropoff_zone_key,service_key,channel_key,client_key,driver_key,outcome_key,payment_method_key,order_id,order_count,fare_amount,vat_amount,commission_amount,driver_payout,company_revenue,quoted_amount,distance_km,assign_minutes,arrival_minutes,wait_minutes,trip_minutes,late_count,preorder_count |
+|               columns.comments                     |
+|               columns.types int:int:int:int:int:int:int:int:int:int:int:bigint:int:decimal(12,2):decimal(12,2):decimal(12,2):decimal(12,2):decimal(12,2):decimal(12,2):double:double:double:double:double:int:int |
+|               file.inputformat org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat |
+|               file.outputformat org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat |
+|               location hdfs://localhost:8020/lake/analytics/dw/fact_orders/branch_code=B/order_month=2026-11 |
+|               name dw.fact_orders                  |
+|               numFiles 1                           |
+|               partition_columns branch_code/order_month |
+|               partition_columns.types string:string |
+|               serialization.ddl struct fact_orders { i32 date_key, i32 hour_key, i32 branch_key, i32 pickup_zone_key, i32 dropoff_zone_key, i32 service_key, i32 channel_key, i32 client_key, i32 driver_key, i32 outcome_key, i32 payment_method_key, i64 order_id, i32 order_count, decimal(12,2) fare_amount, decimal(12,2) vat_amount, decimal(12,2) commission_amount, decimal(12,2) driver_payout, decimal(12,2) company_revenue, decimal(12,2) quoted_amount, double distance_km, double assign_minutes, double arrival_minutes, double wait_minutes, double trip_minutes, i32 late_count, i32 preorder_count} |
+|               serialization.format 1               |
+|               serialization.lib org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe |
+|               totalSize 812845                     |
+|               transient_lastDdlTime 1795111553     |
+|             serde: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe |
+|                                                    |
+|               input format: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat |
+|               output format: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat |
+|               properties:                          |
+|                 EXTERNAL TRUE                      |
+|                 bucket_count -1                    |
+|                 column.name.delimiter ,            |
+|                 columns date_key,hour_key,branch_key,pickup_zone_key,dropoff_zone_key,service_key,channel_key,client_key,driver_key,outcome_key,payment_method_key,order_id,order_count,fare_amount,vat_amount,commission_amount,driver_payout,company_revenue,quoted_amount,distance_km,assign_minutes,arrival_minutes,wait_minutes,trip_minutes,late_count,preorder_count |
+|                 columns.comments                   |
+|                 columns.types int:int:int:int:int:int:int:int:int:int:int:bigint:int:decimal(12,2):decimal(12,2):decimal(12,2):decimal(12,2):decimal(12,2):decimal(12,2):double:double:double:double:double:int:int |
+|                 file.inputformat org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat |
+|                 file.outputformat org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat |
+|                 location hdfs://localhost:8020/lake/analytics/dw/fact_orders |
+|                 name dw.fact_orders                |
+|                 partition_columns branch_code/order_month |
+|                 partition_columns.types string:string |
+|                 serialization.ddl struct fact_orders { i32 date_key, i32 hour_key, i32 branch_key, i32 pickup_zone_key, i32 dropoff_zone_key, i32 service_key, i32 channel_key, i32 client_key, i32 driver_key, i32 outcome_key, i32 payment_method_key, i64 order_id, i32 order_count, decimal(12,2) fare_amount, decimal(12,2) vat_amount, decimal(12,2) commission_amount, decimal(12,2) driver_payout, decimal(12,2) company_revenue, decimal(12,2) quoted_amount, double distance_km, double assign_minutes, double arrival_minutes, double wait_minutes, double trip_minutes, i32 late_count, i32 preorder_count} |
+|                 serialization.format 1             |
+|                 serialization.lib org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe |
+|                 transient_lastDdlTime 1795111553   |
+|               serde: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe |
+|               name: dw.fact_orders                 |
+|             name: dw.fact_orders                   |
+|       Truncated Path -> Alias:                     |
+|         hdfs://localhost:8020/lake/analytics/dw/fact_orders/branch_code=B/order_month=2026-11 [fact_orders] |
+|       Needs Tagging: false                         |
+|       Reduce Operator Tree:                        |
+|         Group By Operator                          |
+|           aggregations: count(VALUE._col0)         |
+|           mode: mergepartial                       |
+|           outputColumnNames: _col0                 |
+|           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE |
+|           File Output Operator                     |
+|             compressed: false                      |
+|             GlobalTableId: 0                       |
+|             directory: hdfs://localhost:8020/tmp/hive/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-27_032_4823150710339779780-1/-mr-10001/.hive-staging_hive_2026-11-19_18-13-27_032_4823150710339779780-1/-ext-10002 |
+|             NumFilesPerFileSink: 1                 |
+|             Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE |
+|             Stats Publishing Key Prefix: hdfs://localhost:8020/tmp/hive/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-27_032_4823150710339779780-1/-mr-10001/.hive-staging_hive_2026-11-19_18-13-27_032_4823150710339779780-1/-ext-10002/ |
+|             table:                                 |
+|                 input format: org.apache.hadoop.mapred.SequenceFileInputFormat |
+|                 output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat |
+|                 properties:                        |
+|                   columns _col0                    |
++----------------------------------------------------+
+|                      Explain                       |
++----------------------------------------------------+
+|                   columns.types bigint             |
+|                   escape.delim \                   |
+|                   hive.serialization.extend.additional.nesting.levels true |
+|                   serialization.escape.crlf true   |
+|                   serialization.format 1           |
+|                   serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe |
+|                 serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe |
+|             TotalFiles: 1                          |
+|             GatherStats: false                     |
+|             MultiFileSpray: false                  |
+|                                                    |
+|   Stage: Stage-0                                   |
+|     Fetch Operator                                 |
+|       limit: -1                                    |
+|       Processor Tree:                              |
+|         ListSink                                   |
+|                                                    |
++----------------------------------------------------+
+117 rows selected (0.158 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- Q13 Drill-across by zone: orders picked up in each zone against free-car minutes in the same zone and hour
+0: jdbc:hive2://localhost:10000> --     (supply against demand for pricing; branch A on the morning of the real extract, 07:00-09:59)
+0: jdbc:hive2://localhost:10000> SELECT z.zone_code, z.zone_type, o.hour_key, o.orders, o.cancelled, COALESCE(s.free_minutes, 0) AS free_car_minutes,
+. . . . . . . . . . . . . . . .>        ROUND(COALESCE(s.free_minutes, 0) / o.orders, 1) AS free_minutes_per_order
+. . . . . . . . . . . . . . . .> FROM (
+. . . . . . . . . . . . . . . .>   SELECT f.branch_key, f.pickup_zone_key AS zone_key, f.hour_key, SUM(f.order_count) AS orders,
+. . . . . . . . . . . . . . . .>          SUM(IF(oc.outcome_group = 'CANCELLED', 1, 0)) AS cancelled
+. . . . . . . . . . . . . . . .>   FROM fact_orders f JOIN dim_outcome oc ON f.outcome_key = oc.outcome_key
+. . . . . . . . . . . . . . . .>   WHERE f.date_key = 20261116 AND f.branch_key = 1 AND f.hour_key BETWEEN 7 AND 9 AND f.pickup_zone_key > 0
+. . . . . . . . . . . . . . . .>   GROUP BY f.branch_key, f.pickup_zone_key, f.hour_key
+. . . . . . . . . . . . . . . .> ) o
+. . . . . . . . . . . . . . . .> LEFT JOIN (
+. . . . . . . . . . . . . . . .>   SELECT branch_key, zone_key, hour_key, SUM(minutes_free) AS free_minutes
+. . . . . . . . . . . . . . . .>   FROM fact_fleet_activity
+. . . . . . . . . . . . . . . .>   WHERE date_key = 20261116 AND branch_key = 1
+. . . . . . . . . . . . . . . .>   GROUP BY branch_key, zone_key, hour_key
+. . . . . . . . . . . . . . . .> ) s ON o.branch_key = s.branch_key AND o.zone_key = s.zone_key AND o.hour_key = s.hour_key
+. . . . . . . . . . . . . . . .> JOIN dim_zone z ON o.zone_key = z.zone_key
+. . . . . . . . . . . . . . . .> ORDER BY o.hour_key, o.orders DESC;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:13:41	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:13:41	Dump the side-table for tag: 1 with group count: 5 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-27_200_1769934584446621864-1/-local-10013/HashTable-Stage-2/MapJoin-mapfile301--.hashtable
+2026-11-19 18:13:41	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-27_200_1769934584446621864-1/-local-10013/HashTable-Stage-2/MapJoin-mapfile301--.hashtable (413 bytes)
+2026-11-19 18:13:41	End of local task; Time Taken: 0.696 sec.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:13:55	Starting to launch local task to process map join;	maximum memory = 954728448
+2026-11-19 18:13:56	Dump the side-table for tag: 1 with group count: 36 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-27_200_1769934584446621864-1/-local-10011/HashTable-Stage-10/MapJoin-mapfile291--.hashtable
+2026-11-19 18:13:56	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-27_200_1769934584446621864-1/-local-10011/HashTable-Stage-10/MapJoin-mapfile291--.hashtable (1060 bytes)
+2026-11-19 18:13:56	End of local task; Time Taken: 0.337 sec.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:14:05	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:14:06	Dump the side-table for tag: 1 with group count: 24 into file: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-27_200_1769934584446621864-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile281--.hashtable
+2026-11-19 18:14:06	Uploaded 1 File to: file:/tmp/bigdata/c4f44b25-c60c-4c96-8243-17bb9366caf4/hive_2026-11-19_18-13-27_200_1769934584446621864-1/-local-10009/HashTable-Stage-5/MapJoin-mapfile281--.hashtable (1095 bytes)
+2026-11-19 18:14:06	End of local task; Time Taken: 0.638 sec.
++--------------+--------------+-------------+-----------+--------------+-------------------+-------------------------+
+| z.zone_code  | z.zone_type  | o.hour_key  | o.orders  | o.cancelled  | free_car_minutes  | free_minutes_per_order  |
++--------------+--------------+-------------+-----------+--------------+-------------------+-------------------------+
+| A-M2         | CENTRE       | 7           | 47        | 11           | 1243              | 26.4                    |
+| A-M3         | CENTRE       | 7           | 36        | 3            | 413               | 11.5                    |
+| A-M1         | RESIDENTIAL  | 7           | 15        | 2            | 529               | 35.3                    |
+| A-N2         | RESIDENTIAL  | 7           | 14        | 2            | 266               | 19.0                    |
+| A-S2         | RESIDENTIAL  | 7           | 11        | 3            | 89                | 8.1                     |
+| A-N3         | RESIDENTIAL  | 7           | 10        | 5            | 51                | 5.1                     |
+| A-S3         | RESIDENTIAL  | 7           | 8         | 1            | 126               | 15.8                    |
+| A-S4         | SUBURB       | 7           | 7         | 1            | 209               | 29.9                    |
+| A-N4         | INDUSTRIAL   | 7           | 4         | 1            | 52                | 13.0                    |
+| A-M4         | RESIDENTIAL  | 7           | 4         | 1            | 39                | 9.8                     |
+| A-N1         | SUBURB       | 7           | 3         | 2            | 82                | 27.3                    |
+| A-S1         | INDUSTRIAL   | 7           | 1         | 0            | 0                 | 0.0                     |
+| A-M2         | CENTRE       | 8           | 77        | 22           | 2071              | 26.9                    |
+| A-M3         | CENTRE       | 8           | 47        | 10           | 288               | 6.1                     |
+| A-M1         | RESIDENTIAL  | 8           | 18        | 5            | 510               | 28.3                    |
+| A-S2         | RESIDENTIAL  | 8           | 12        | 4            | 226               | 18.8                    |
+| A-N2         | RESIDENTIAL  | 8           | 9         | 2            | 408               | 45.3                    |
+| A-M4         | RESIDENTIAL  | 8           | 9         | 1            | 74                | 8.2                     |
+| A-S3         | RESIDENTIAL  | 8           | 8         | 0            | 242               | 30.3                    |
+| A-N4         | INDUSTRIAL   | 8           | 6         | 1            | 211               | 35.2                    |
+| A-N1         | SUBURB       | 8           | 6         | 2            | 278               | 46.3                    |
+| A-N3         | RESIDENTIAL  | 8           | 5         | 0            | 56                | 11.2                    |
+| A-S4         | SUBURB       | 8           | 3         | 0            | 277               | 92.3                    |
+| A-S1         | INDUSTRIAL   | 8           | 2         | 0            | 8                 | 4.0                     |
+| A-M2         | CENTRE       | 9           | 43        | 8            | 2654              | 61.7                    |
+| A-M3         | CENTRE       | 9           | 43        | 9            | 327               | 7.6                     |
+| A-M1         | RESIDENTIAL  | 9           | 11        | 2            | 875               | 79.5                    |
+| A-S2         | RESIDENTIAL  | 9           | 10        | 5            | 291               | 29.1                    |
+| A-S3         | RESIDENTIAL  | 9           | 10        | 0            | 258               | 25.8                    |
+| A-N2         | RESIDENTIAL  | 9           | 7         | 0            | 567               | 81.0                    |
+| A-M4         | RESIDENTIAL  | 9           | 5         | 1            | 35                | 7.0                     |
+| A-N1         | SUBURB       | 9           | 5         | 2            | 269               | 53.8                    |
+| A-S1         | INDUSTRIAL   | 9           | 4         | 0            | 33                | 8.3                     |
+| A-N3         | RESIDENTIAL  | 9           | 2         | 0            | 145               | 72.5                    |
+| A-N4         | INDUSTRIAL   | 9           | 1         | 0            | 203               | 203.0                   |
+| A-S4         | SUBURB       | 9           | 1         | 0            | 244               | 244.0                   |
++--------------+--------------+-------------+-----------+--------------+-------------------+-------------------------+
+36 rows selected (52.286 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> Closing: 0: jdbc:hive2://localhost:10000
+[wall-clock time of the command: 391 s]

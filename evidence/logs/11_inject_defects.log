@@ -1,0 +1,10 @@
+bigdata@datalake:~$ bash project/pipelines/tests/inject_defects.sh
+order 1: client 9999901 (unknown), fare 500, order 76990001
+order 2: driver 999901 (unknown), fare 700, order 76990002
+order 3: newer version of order 76826740 status changed at 2026-11-15 00:30:00
+new client: 9999902 (branch A)
+-rw-r--r--   1 bigdata supergroup     913339 2026-11-19 17:51 /lake/raw/dispatch/orders/branch=A/dt=2026-11-15/orders_A_20261115.csv
+-rw-r--r--   1 bigdata supergroup       2191 2026-11-19 18:06 /lake/raw/dispatch/orders/branch=A/dt=2026-11-15/orders_A_20261115_second_night.csv
+-rw-r--r--   1 bigdata supergroup    4930805 2026-11-19 17:52 /lake/raw/dispatch/reference/clients/clients.csv
+-rw-r--r--   1 bigdata supergroup        102 2026-11-19 18:06 /lake/raw/dispatch/reference/clients/clients_delta_20261116.csv
+[wall-clock time of the command: 2 s]

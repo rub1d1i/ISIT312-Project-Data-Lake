@@ -1,0 +1,11 @@
+bigdata@datalake:~$ hadoop fs -du -s -h /lake/raw /lake/raw/dispatch/orders /lake/curated /lake/curated/orders /lake/analytics /lake/analytics/dw/fact_orders 2>/dev/null; hadoop fs -count /lake/raw /lake/curated /lake/analytics 2>/dev/null
+568.4 M  /lake/raw
+83.9 M  /lake/raw/dispatch/orders
+217.1 M  /lake/curated
+17.0 M  /lake/curated/orders
+22.2 M  /lake/analytics
+6.6 M  /lake/analytics/dw/fact_orders
+         443          690          595964284 /lake/raw
+          60           66          227622869 /lake/curated
+          36           42           23302833 /lake/analytics
+[wall-clock time of the command: 1 s]

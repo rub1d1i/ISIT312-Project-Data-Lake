@@ -1,0 +1,65 @@
+bigdata@datalake:~$ spark-shell --master yarn --conf spark.ui.showConsoleProgress=false -i project/pipelines/spark/21_curate_other_sources.scala
+26/11/19 18:03:30 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = yarn, app id = application_1795110592923_0014).
+Spark session available as 'spark'.
+app events: schema inferred from the JSON documents
+root
+ |-- app_version: string (nullable = true)
+ |-- branch: string (nullable = true)
+ |-- client_id: long (nullable = true)
+ |-- device: struct (nullable = true)
+ |    |-- model: string (nullable = true)
+ |    |-- os_version: string (nullable = true)
+ |-- event: string (nullable = true)
+ |-- event_id: string (nullable = true)
+ |-- geo: struct (nullable = true)
+ |    |-- accuracy_m: long (nullable = true)
+ |    |-- lat: double (nullable = true)
+ |    |-- lon: double (nullable = true)
+ |-- platform: string (nullable = true)
+ |-- props: struct (nullable = true)
+ |    |-- from_zone: long (nullable = true)
+ |    |-- order_id: long (nullable = true)
+ |    |-- payment: string (nullable = true)
+ |    |-- price: double (nullable = true)
+ |    |-- query_len: long (nullable = true)
+ |    |-- quoted_price: double (nullable = true)
+ |    |-- results: long (nullable = true)
+ |    |-- seconds_after_create: long (nullable = true)
+ |    |-- service: long (nullable = true)
+ |    |-- stars: long (nullable = true)
+ |    |-- surge: double (nullable = true)
+ |-- session_id: string (nullable = true)
+ |-- ts: string (nullable = true)
+ |-- dt: date (nullable = true)
+
+curated row counts
++-----------------+------+
+|curated_table    |rows  |
++-----------------+------+
+|calls            |660377|
+|payments         |167570|
+|gl_entries       |412   |
+|app_events       |39660 |
+|competitor_prices|40140 |
+|traffic_index    |2230  |
+|dashcam_requests |248   |
++-----------------+------+
+
+accounting export after decoding (first rows)
++----------+-----------+-------+--------------------------------+-----------+--------+--------------+--------------+
+|doc_date  |branch_code|account|item                            |amount     |currency|posting       |item_group    |
++----------+-----------+-------+--------------------------------+-----------+--------+--------------+--------------+
+|2026-10-01|A          |20.01  |Выплаты водителям-подрядчикам   |-1828697.40|RUB     |Дт 20.01 Кт 60|DRIVER_PAYOUTS|
+|2026-10-01|A          |90.01  |Выручка: грузовые перевозки     |434238.60  |RUB     |Дт 62 Кт 90.01|REVENUE       |
+|2026-10-01|A          |90.01  |Выручка: эвакуация и спецтехника|90853.20   |RUB     |Дт 62 Кт 90.01|REVENUE       |
+|2026-10-01|A          |90.01  |Выручка: пассажирские перевозки |2237213.00 |RUB     |Дт 62 Кт 90.01|REVENUE       |
+|2026-10-01|B          |20.01  |Выплаты водителям-подрядчикам   |-728461.41 |RUB     |Дт 20.01 Кт 60|DRIVER_PAYOUTS|
+|2026-10-01|B          |90.01  |Выручка: грузовые перевозки     |166720.60  |RUB     |Дт 62 Кт 90.01|REVENUE       |
++----------+-----------+-------+--------------------------------+-----------+--------+--------------+--------------+
+only showing top 6 rows
+
+[wall-clock time of the command: 23 s]

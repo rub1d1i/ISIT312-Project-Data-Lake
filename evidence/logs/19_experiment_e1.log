@@ -1,0 +1,46 @@
+bigdata@datalake:~$ bash project/pipelines/experiments/e1_engines.sh
+== preparing inputs: merged raw order export at 1x, 5x and 20x
+26/11/19 18:20:44 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:45 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:46 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:46 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:47 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:48 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:49 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:49 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:50 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:50 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:53 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:54 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+83.8 M  /lake/tmp/e1/x1
+419.1 M  /lake/tmp/e1/x5
+1.6 G  /lake/tmp/e1/x20
+== start-up alone: each engine on an input of one order row, three runs
+26/11/19 18:20:58 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 18:20:59 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+== size 1x, three runs per engine
+== size 5x, three runs per engine
+== size 20x, three runs per engine
+== curated Parquet table (1x): what the storage format adds
+
+== E1 result: seconds from submit to result (start-up included), median of three runs
+engine                                  size  seconds   rows   note
+MapReduce (Hadoop Streaming, Python)    1row       10      1   2 map tasks; runs 10/10/10 s
+Pig (on MapReduce)                      1row       12      1   same counts as MapReduce; runs 17/12/12 s
+Hive (on MapReduce)                     1row       14      1   ; runs 13/14/14 s
+Spark SQL (on YARN)                     1row       12      1   query alone 2.5 s; runs 11/12/12 s
+MapReduce (Hadoop Streaming, Python)      1x       10    469   3 map tasks; runs 11/10/10 s
+Pig (on MapReduce)                        1x       12    469   same counts as MapReduce; runs 17/12/11 s
+Hive (on MapReduce)                       1x       14    469   ; runs 14/14/14 s
+Spark SQL (on YARN)                       1x       12    469   query alone 3.0 s; runs 11/13/12 s
+MapReduce (Hadoop Streaming, Python)      5x       12    469   5 map tasks; runs 11/12/12 s
+Pig (on MapReduce)                        5x       17    469   same counts as MapReduce; runs 17/12/17 s
+Hive (on MapReduce)                       5x       15    469   ; runs 15/16/15 s
+Spark SQL (on YARN)                       5x       14    469   query alone 3.9 s; runs 13/14/14 s
+MapReduce (Hadoop Streaming, Python)     20x       15    469   14 map tasks; runs 15/15/16 s
+Pig (on MapReduce)                       20x       22    469   same counts as MapReduce; runs 22/17/22 s
+Hive (on MapReduce)                      20x       20    469   ; runs 22/20/20 s
+Spark SQL (on YARN)                      20x       17    469   query alone 7.0 s; runs 18/17/16 s
+Hive on curated Parquet                   1x       14    469   
+Spark SQL on curated Parquet              1x       12    469   query alone 2.8 s
+[wall-clock time of the command: 773 s]

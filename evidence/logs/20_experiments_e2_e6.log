@@ -1,0 +1,62 @@
+bigdata@datalake:~$ bash project/pipelines/experiments/e2_to_e6.sh
+=================== E2: MapReduce on one minute of positions ===================
+26/11/19 18:33:47 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+positions received in the minute 08:30 (both branches): 405
+26/11/19 18:33:48 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+run 1: MapReduce job over one minute of data took 9.8 s (submit to result: every run is a new job)
+run 2: MapReduce job over one minute of data took 9.9 s (submit to result: every run is a new job)
+run 3: MapReduce job over one minute of data took 9.8 s (submit to result: every run is a new job)
+result (positions per vehicle state code):
+26/11/19 18:34:19 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+     59 0	
+    181 1	
+    161 2	
+      4 3	
+
+=================== E3: small files against one packed file ===================
+-- what the NameNode has to keep
+as landed :  Total files: 235  Total blocks (validated): 235 (avg. block size 734341 B) 
+packed    :  Total files: 1  Total blocks (validated): 2 (avg. block size 86291196 B) 
+-- a map-only job that reads every recording once and counts bytes
+as landed : map tasks 235   74.6 s
+packed    : map tasks 2   7.8 s
+
+=================== E4: latest position of one vehicle, Hive and HBase ===================
+vehicle: branch A, driver id 100539
+(both answers are timed by the tool itself: Hive by HiveServer2, HBase by its shell; client start-up is left out for both)
+-- Hive on the positions the stream landed in the raw zone
++----------------------+-----------+------------+--------+------------+
+|          ts          |    lat    |    lon     | state  |     id     |
++----------------------+-----------+------------+--------+------------+
+| 2026-11-16 08:18:00  | 55.94216  | 47.992947  | 2      | 508959698  |
++----------------------+-----------+------------+--------+------------+
+1 row selected (11.621 seconds)
+-- HBase get by row key (the same stream wrote this row)
+COLUMN                CELL                                                      
+ p:lat                timestamp=1794817080000, value=55.94216                   
+ p:lon                timestamp=1794817080000, value=47.992947                  
+ p:speed_ms           timestamp=1794817080000, value=0.0                        
+ p:state              timestamp=1794817080000, value=2                          
+ p:ts                 timestamp=1794817080000, value=2026-11-16 08:18:00        
+5 row(s) in 0.0760 seconds
+
+=================== E5: one status change, Hive INSERT and HBase put ===================
+Hive INSERT of one row, run 1: No rows affected (7.715 seconds)
+Hive INSERT of one row, run 2: No rows affected (8.889 seconds)
+files behind the Hive table after two single-row inserts:
+26/11/19 18:36:22 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+  31 bytes  /lake/tmp/_hive/e5_order_status/000000_0
+  31 bytes  /lake/tmp/_hive/e5_order_status/000000_0_copy_1
+-- HBase put of one cell
+0 row(s) in 0.0810 seconds
+
+=================== E6: one aggregate over all positions, HBase and Parquet ===================
+-- HBase shell: count all rows (a full scan)
+108949 row(s) in 2.2420 seconds
+108949
+run 1: Hive over the HBase table 18.4 s   |   Hive over the Parquet table 12.7 s
+run 2: Hive over the HBase table 20.5 s   |   Hive over the Parquet table 13.8 s
+run 3: Hive over the HBase table 20.5 s   |   Hive over the Parquet table 12.0 s
+positions per state from HBase  : 1=65767 2=41693 3=1219 6=270 
+positions per state from Parquet: 1=65767 2=41693 3=1219 6=270 
+[wall-clock time of the command: 266 s]

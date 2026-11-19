@@ -1,0 +1,25 @@
+bigdata@datalake:~$ bash project/pipelines/01_ingest_batch.sh
+== 1. lake zones
+26/11/19 17:50:59 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 17:51:00 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 17:51:00 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+== 2. staging tree (mirrors the raw zone layout)
+   staged: 646 files, 570M
+== 3. load into HDFS
+26/11/19 17:51:02 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/19 17:51:03 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+   put finished in 238 s
+== 4. what landed (size on disk, per source system)
+26/11/19 17:55:00 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+13.5 M   /lake/raw/app
+13.3 M   /lake/raw/billing
+94.8 M   /lake/raw/dispatch
+6.4 M    /lake/raw/external
+34.8 K   /lake/raw/finance
+21.6 M   /lake/raw/messaging
+238.7 M  /lake/raw/pbx
+178.2 M  /lake/raw/video
+== 5. directories / files / bytes in the raw zone
+26/11/19 17:55:01 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+         435          646          594022184 /lake/raw
+[wall-clock time of the command: 242 s]

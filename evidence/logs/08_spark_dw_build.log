@@ -1,0 +1,45 @@
+bigdata@datalake:~$ spark-shell --master yarn --conf spark.ui.showConsoleProgress=false -i project/pipelines/spark/30_dw_build.scala
+26/11/19 18:04:33 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = yarn, app id = application_1795110592923_0016).
+Spark session available as 'spark'.
+26/11/19 18:04:46 WARN util.Utils: Truncated the string representation of a plan since it was too large. This behavior can be adjusted by setting 'spark.debug.maxToStringFields' in SparkEnv.conf.
+26/11/19 18:04:49 WARN window.WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
+26/11/19 18:04:50 WARN window.WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
+26/11/19 18:04:51 WARN window.WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
+26/11/19 18:04:51 WARN window.WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
+warehouse load report
++--------------------------------------------------------------+------+
+|table                                                         |rows  |
++--------------------------------------------------------------+------+
+|dim_branch                                                    |2     |
+|dim_date                                                      |47    |
+|dim_time_of_day                                               |24    |
+|dim_zone                                                      |25    |
+|dim_service                                                   |8     |
+|dim_channel                                                   |4     |
+|dim_outcome                                                   |5     |
+|dim_payment_method                                            |4     |
+|dim_client                                                    |147001|
+|dim_driver                                                    |2502  |
+|dim_operator                                                  |63    |
+|dim_ledger_item                                               |13    |
+|fact_orders                                                   |220545|
+|fact_fleet_activity                                           |4927  |
+|fact_calls                                                    |660377|
+|fact_market_hourly                                            |2230  |
+|fact_ledger                                                   |412   |
+|orders loaded with an UNKNOWN key (also in the exception file)|0     |
++--------------------------------------------------------------+------+
+
+control totals: what clients paid, in the fact table, in the payment system and in the accounting export
++-----------+------+----------------+---------------+--------------+-------------------+-----------------+
+|branch_code|orders|fact_fare_amount|payments_amount|ledger_revenue|fact_minus_payments|fact_minus_ledger|
++-----------+------+----------------+---------------+--------------+-------------------+-----------------+
+|A          |142094|118618194.08    |118618194.08   |118618194.08  |0.00               |0.00             |
+|B          |78451 |53211998.20     |53211998.20    |53211998.20   |0.00               |0.00             |
++-----------+------+----------------+---------------+--------------+-------------------+-----------------+
+
+[wall-clock time of the command: 30 s]

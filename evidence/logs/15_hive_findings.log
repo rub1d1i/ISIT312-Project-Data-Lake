@@ -1,0 +1,252 @@
+bigdata@datalake:~$ beeline --color=false -u jdbc:hive2://localhost:10000 -n bigdata -f project/pipelines/hive/05_findings_real_extract.hql
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> -- Findings from the REAL extract only: branch A, 16 Nov 2026, 00:00-10:11
+0: jdbc:hive2://localhost:10000> -- (851 orders) and the vehicle positions of the same morning.
+0: jdbc:hive2://localhost:10000> -- Every other day and all of branch B are generated and are left out here on
+0: jdbc:hive2://localhost:10000> -- purpose: the generator was built to resemble this extract in volume and mix,
+0: jdbc:hive2://localhost:10000> -- so a finding drawn from generated rows would only show what was put in.
+0: jdbc:hive2://localhost:10000> -- One branch and one Monday morning is a small base; read the numbers as
+0: jdbc:hive2://localhost:10000> -- questions worth asking of the full history, not as final answers.
+0: jdbc:hive2://localhost:10000> -- Run: beeline -u jdbc:hive2://localhost:10000 -n bigdata -f 05_findings_real_extract.hql
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> USE lake_curated;
+No rows affected (0.029 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F1  How orders arrive and how many are lost, by intake account
+0: jdbc:hive2://localhost:10000> SELECT channel, COUNT(*) AS orders,
+. . . . . . . . . . . . . . . .>        ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 1) AS share_pct,
+. . . . . . . . . . . . . . . .>        SUM(IF(outcome LIKE 'CANCELLED%', 1, 0)) AS cancelled,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(IF(outcome LIKE 'CANCELLED%', 1, 0)) * 100.0 / COUNT(*), 1) AS cancelled_pct,
+. . . . . . . . . . . . . . . .>        SUM(IF(recording_uid IS NOT NULL, 1, 0)) AS with_call_recording,
+. . . . . . . . . . . . . . . .>        SUM(IF(app_pickup_lat IS NOT NULL, 1, 0)) AS with_phone_coordinates,
+. . . . . . . . . . . . . . . .>        SUM(card_payment) AS paid_by_card
+. . . . . . . . . . . . . . . .> FROM orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16'
+. . . . . . . . . . . . . . . .> GROUP BY channel
+. . . . . . . . . . . . . . . .> ORDER BY orders DESC;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++-------------------+---------+------------+------------+----------------+----------------------+-------------------------+---------------+
+|      channel      | orders  | share_pct  | cancelled  | cancelled_pct  | with_call_recording  | with_phone_coordinates  | paid_by_card  |
++-------------------+---------+------------+------------+----------------+----------------------+-------------------------+---------------+
+| CALL_CENTRE       | 591     | 69.4       | 93         | 15.7           | 589                  | 0                       | 0             |
+| MOBILE_APP        | 242     | 28.4       | 99         | 40.9           | 0                    | 177                     | 71            |
+| CORPORATE_PORTAL  | 17      | 2.0        | 1          | 5.9            | 0                    | 0                       | 0             |
+| WEBSITE           | 1       | 0.1        | 1          | 100.0          | 0                    | 0                       | 1             |
++-------------------+---------+------------+------------+----------------+----------------------+-------------------------+---------------+
+4 rows selected (35.689 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F1b Is the gap between the app and the call centre a matter of the hour? Cancelled share by channel within hour bands
+0: jdbc:hive2://localhost:10000> SELECT CASE WHEN order_hour < 6 THEN '00-05' WHEN order_hour < 9 THEN '06-08' ELSE '09-10' END AS hours, channel,
+. . . . . . . . . . . . . . . .>        COUNT(*) AS orders,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(IF(outcome LIKE 'CANCELLED%', 1, 0)) * 100.0 / COUNT(*), 1) AS cancelled_pct
+. . . . . . . . . . . . . . . .> FROM orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16' AND channel IN ('MOBILE_APP', 'CALL_CENTRE')
+. . . . . . . . . . . . . . . .> GROUP BY CASE WHEN order_hour < 6 THEN '00-05' WHEN order_hour < 9 THEN '06-08' ELSE '09-10' END, channel
+. . . . . . . . . . . . . . . .> ORDER BY hours, channel;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++--------+--------------+---------+----------------+
+| hours  |   channel    | orders  | cancelled_pct  |
++--------+--------------+---------+----------------+
+| 00-05  | CALL_CENTRE  | 153     | 20.9           |
+| 00-05  | MOBILE_APP   | 64      | 39.1           |
+| 06-08  | CALL_CENTRE  | 341     | 14.7           |
+| 06-08  | MOBILE_APP   | 125     | 40.0           |
+| 09-10  | CALL_CENTRE  | 97      | 11.3           |
+| 09-10  | MOBILE_APP   | 53      | 45.3           |
++--------+--------------+---------+----------------+
+6 rows selected (22.769 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F1c Is a cancelled order lost demand? Cancelled orders followed by a new order of the same client within 30 minutes
+0: jdbc:hive2://localhost:10000> SELECT c.channel, COUNT(DISTINCT c.order_id) AS cancelled,
+. . . . . . . . . . . . . . . .>        COUNT(DISTINCT IF(n.order_id IS NOT NULL, c.order_id, NULL)) AS reordered_within_30_min,
+. . . . . . . . . . . . . . . .>        ROUND(COUNT(DISTINCT IF(n.order_id IS NOT NULL, c.order_id, NULL)) * 100.0 / COUNT(DISTINCT c.order_id), 1) AS reordered_pct
+. . . . . . . . . . . . . . . .> FROM (SELECT order_id, cod_cl, channel, accepted_ts FROM orders
+. . . . . . . . . . . . . . . .>       WHERE branch_code = 'A' AND order_date = '2026-11-16' AND outcome LIKE 'CANCELLED%' AND cod_cl IS NOT NULL AND cod_cl > 0) c
+. . . . . . . . . . . . . . . .> LEFT JOIN (SELECT order_id, cod_cl, accepted_ts FROM orders WHERE branch_code = 'A' AND order_date = '2026-11-16') n
+. . . . . . . . . . . . . . . .>   ON n.cod_cl = c.cod_cl AND n.order_id <> c.order_id
+. . . . . . . . . . . . . . . .>  AND unix_timestamp(n.accepted_ts) > unix_timestamp(c.accepted_ts)
+. . . . . . . . . . . . . . . .>  AND unix_timestamp(n.accepted_ts) <= unix_timestamp(c.accepted_ts) + 1800
+. . . . . . . . . . . . . . . .> WHERE c.channel IN ('MOBILE_APP', 'CALL_CENTRE')
+. . . . . . . . . . . . . . . .> GROUP BY c.channel
+. . . . . . . . . . . . . . . .> ORDER BY c.channel;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-19 18:15:33	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-19 18:15:33	Dump the side-table for tag: 1 with group count: 783 into file: file:/tmp/bigdata/998e508c-ba44-4453-adf8-c2cf729368d9/hive_2026-11-19_18-15-31_647_8233725833963088949-1/-local-10006/HashTable-Stage-5/MapJoin-mapfile311--.hashtable
+2026-11-19 18:15:33	Uploaded 1 File to: file:/tmp/bigdata/998e508c-ba44-4453-adf8-c2cf729368d9/hive_2026-11-19_18-15-31_647_8233725833963088949-1/-local-10006/HashTable-Stage-5/MapJoin-mapfile311--.hashtable (25608 bytes)
+2026-11-19 18:15:33	End of local task; Time Taken: 0.691 sec.
++--------------+------------+--------------------------+----------------+
+|  c.channel   | cancelled  | reordered_within_30_min  | reordered_pct  |
++--------------+------------+--------------------------+----------------+
+| CALL_CENTRE  | 93         | 8                        | 8.6            |
+| MOBILE_APP   | 99         | 19                       | 19.2           |
++--------------+------------+--------------------------+----------------+
+2 rows selected (32.717 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F2  Who pays: non-cash (corporate) orders by intake account, and how many carry the 22 % pattern
+0: jdbc:hive2://localhost:10000> SELECT channel, client_segment, COUNT(*) AS orders, SUM(IF(vat_amount IS NOT NULL, 1, 0)) AS price_is_round_amount_plus_22pct
+. . . . . . . . . . . . . . . .> FROM orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16'
+. . . . . . . . . . . . . . . .> GROUP BY channel, client_segment
+. . . . . . . . . . . . . . . .> ORDER BY channel, client_segment;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++-------------------+-----------------+---------+-----------------------------------+
+|      channel      | client_segment  | orders  | price_is_round_amount_plus_22pct  |
++-------------------+-----------------+---------+-----------------------------------+
+| CALL_CENTRE       | CORPORATE       | 36      | 19                                |
+| CALL_CENTRE       | PRIVATE         | 555     | 0                                 |
+| CORPORATE_PORTAL  | CORPORATE       | 11      | 11                                |
+| CORPORATE_PORTAL  | PRIVATE         | 6       | 0                                 |
+| MOBILE_APP        | CORPORATE       | 2       | 1                                 |
+| MOBILE_APP        | PRIVATE         | 240     | 0                                 |
+| WEBSITE           | PRIVATE         | 1       | 0                                 |
++-------------------+-----------------+---------+-----------------------------------+
+7 rows selected (24.836 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F3  Orders flagged "no car by the promised time" (D_OPAZD) and the fate of the order
+0: jdbc:hive2://localhost:10000> SELECT IF(is_late, 'flagged: no car in time', 'not flagged') AS arrival, COUNT(*) AS orders,
+. . . . . . . . . . . . . . . .>        SUM(IF(outcome LIKE 'CANCELLED%', 1, 0)) AS cancelled,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(IF(outcome LIKE 'CANCELLED%', 1, 0)) * 100.0 / COUNT(*), 1) AS cancelled_pct
+. . . . . . . . . . . . . . . .> FROM orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16'
+. . . . . . . . . . . . . . . .> GROUP BY IF(is_late, 'flagged: no car in time', 'not flagged');
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++--------------------------+---------+------------+----------------+
+|         arrival          | orders  | cancelled  | cancelled_pct  |
++--------------------------+---------+------------+----------------+
+| flagged: no car in time  | 49      | 35         | 71.4           |
+| not flagged              | 802     | 159        | 19.8           |
++--------------------------+---------+------------+----------------+
+2 rows selected (13.294 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F3b The flagged orders that were cancelled: was a driver on the order when it was cancelled?
+0: jdbc:hive2://localhost:10000> --     (assigned_ts is D_BUSY, the time a driver was assigned; cod_drv is the driver on the order now)
+0: jdbc:hive2://localhost:10000> SELECT CASE WHEN cod_drv IS NOT NULL THEN 'driver on the order when cancelled'
+. . . . . . . . . . . . . . . .>             WHEN assigned_ts IS NOT NULL THEN 'driver assigned earlier, no longer on the order'
+. . . . . . . . . . . . . . . .>             ELSE 'no driver ever assigned' END AS driver,
+. . . . . . . . . . . . . . . .>        COUNT(*) AS orders
+. . . . . . . . . . . . . . . .> FROM orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16' AND is_late AND outcome LIKE 'CANCELLED%'
+. . . . . . . . . . . . . . . .> GROUP BY CASE WHEN cod_drv IS NOT NULL THEN 'driver on the order when cancelled'
+. . . . . . . . . . . . . . . .>               WHEN assigned_ts IS NOT NULL THEN 'driver assigned earlier, no longer on the order'
+. . . . . . . . . . . . . . . .>               ELSE 'no driver ever assigned' END;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++--------------------------------------------------+---------+
+|                      driver                      | orders  |
++--------------------------------------------------+---------+
+| driver assigned earlier, no longer on the order  | 16      |
+| driver on the order when cancelled               | 3       |
+| no driver ever assigned                          | 16      |
++--------------------------------------------------+---------+
+3 rows selected (13.025 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F4  Price per kilometre through the night and the morning peak (standard passenger trips, completed)
+0: jdbc:hive2://localhost:10000> SELECT order_hour, COUNT(*) AS trips, ROUND(AVG(distance_km), 1) AS avg_km,
+. . . . . . . . . . . . . . . .>        ROUND(percentile_approx(CAST(pay AS DOUBLE) / distance_km, 0.5), 1) AS median_rub_per_km
+. . . . . . . . . . . . . . . .> FROM orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16' AND cart = 1 AND outcome = 'COMPLETED' AND distance_km > 1
+. . . . . . . . . . . . . . . .> GROUP BY order_hour
+. . . . . . . . . . . . . . . .> ORDER BY order_hour;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++-------------+--------+---------+--------------------+
+| order_hour  | trips  | avg_km  | median_rub_per_km  |
++-------------+--------+---------+--------------------+
+| 0           | 22     | 15.8    | 66.8               |
+| 1           | 17     | 11.0    | 47.2               |
+| 2           | 19     | 14.5    | 49.7               |
+| 3           | 23     | 10.4    | 45.4               |
+| 4           | 34     | 12.5    | 60.7               |
+| 5           | 37     | 9.5     | 62.7               |
+| 6           | 87     | 9.5     | 64.2               |
+| 7           | 119    | 7.5     | 94.7               |
+| 8           | 151    | 7.6     | 81.7               |
+| 9           | 105    | 6.7     | 66.1               |
+| 10          | 1      | 6.8     | 47.0               |
++-------------+--------+---------+--------------------+
+11 rows selected (23.729 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F4b The same comparison within distance bands: night (orders accepted 00:00-05:59) against the morning peak (07:00-08:59)
+0: jdbc:hive2://localhost:10000> SELECT CASE WHEN distance_km <= 5 THEN '1-5 km' WHEN distance_km <= 10 THEN '5-10 km'
+. . . . . . . . . . . . . . . .>             WHEN distance_km <= 20 THEN '10-20 km' ELSE 'over 20 km' END AS trip_length,
+. . . . . . . . . . . . . . . .>        ROUND(AVG(distance_km), 1) AS avg_km,
+. . . . . . . . . . . . . . . .>        SUM(IF(order_hour < 6, 1, 0)) AS night_trips,
+. . . . . . . . . . . . . . . .>        ROUND(percentile_approx(IF(order_hour < 6, CAST(pay AS DOUBLE) / distance_km, NULL), 0.5), 1) AS night_rub_per_km,
+. . . . . . . . . . . . . . . .>        SUM(IF(order_hour IN (7, 8), 1, 0)) AS peak_trips,
+. . . . . . . . . . . . . . . .>        ROUND(percentile_approx(IF(order_hour IN (7, 8), CAST(pay AS DOUBLE) / distance_km, NULL), 0.5), 1) AS peak_rub_per_km
+. . . . . . . . . . . . . . . .> FROM orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16' AND cart = 1 AND outcome = 'COMPLETED' AND distance_km > 1
+. . . . . . . . . . . . . . . .> GROUP BY CASE WHEN distance_km <= 5 THEN '1-5 km' WHEN distance_km <= 10 THEN '5-10 km'
+. . . . . . . . . . . . . . . .>               WHEN distance_km <= 20 THEN '10-20 km' ELSE 'over 20 km' END
+. . . . . . . . . . . . . . . .> ORDER BY avg_km;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++--------------+---------+--------------+-------------------+-------------+------------------+
+| trip_length  | avg_km  | night_trips  | night_rub_per_km  | peak_trips  | peak_rub_per_km  |
++--------------+---------+--------------+-------------------+-------------+------------------+
+| 1-5 km       | 3.1     | 41           | 79.0              | 108         | 122.5            |
+| 5-10 km      | 7.1     | 57           | 59.4              | 100         | 79.2             |
+| 10-20 km     | 14.1    | 31           | 50.9              | 52          | 59.7             |
+| over 20 km   | 32.7    | 23           | 36.3              | 10          | 43.2             |
++--------------+---------+--------------+-------------------+-------------+------------------+
+4 rows selected (23.579 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F5  Service times of completed orders, in minutes (median and 90th percentile)
+0: jdbc:hive2://localhost:10000> SELECT COUNT(*) AS completed,
+. . . . . . . . . . . . . . . .>        percentile_approx(assign_min, array(0.5, 0.9)) AS accept_to_assign,
+. . . . . . . . . . . . . . . .>        percentile_approx(arrive_min, array(0.5, 0.9)) AS assign_to_arrival,
+. . . . . . . . . . . . . . . .>        percentile_approx(wait_min, array(0.5, 0.9))   AS arrival_to_pickup,
+. . . . . . . . . . . . . . . .>        percentile_approx(trip_min, array(0.5, 0.9))   AS pickup_to_done
+. . . . . . . . . . . . . . . .> FROM orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16' AND outcome = 'COMPLETED';
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++------------+------------------------------------------+------------------------------------------+-----------------------------------------+------------------------------------------+
+| completed  |             accept_to_assign             |            assign_to_arrival             |            arrival_to_pickup            |              pickup_to_done              |
++------------+------------------------------------------+------------------------------------------+-----------------------------------------+------------------------------------------+
+| 627        | [0.8038277511961722,5.7800000000000065]  | [6.3431372549019605,14.561538461538467]  | [1.5879629629629628,7.845454545454552]  | [14.706896551724139,32.860000000000014]  |
++------------+------------------------------------------+------------------------------------------+-----------------------------------------+------------------------------------------+
+1 row selected (12.429 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- F6  The fleet during the same morning: vehicles on line, share of on-shift time spent on an order
+0: jdbc:hive2://localhost:10000> SELECT hour(received_ts) AS hour_of_day, COUNT(DISTINCT cod_drv) AS vehicles_on_shift,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(IF(state_id = 2, 1, 0)) * 100.0 / COUNT(*), 1) AS on_order_pct,
+. . . . . . . . . . . . . . . .>        ROUND(AVG(IF(state_id = 2 AND speed_kmh > 0, speed_kmh, NULL)), 1) AS avg_kmh_on_order,
+. . . . . . . . . . . . . . . .>        SUM(IF(in_city, 0, 1)) AS positions_outside_city
+. . . . . . . . . . . . . . . .> FROM gps_positions
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND dt = '2026-11-16'
+. . . . . . . . . . . . . . . .> GROUP BY hour(received_ts)
+. . . . . . . . . . . . . . . .> ORDER BY hour_of_day;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++--------------+--------------------+---------------+-------------------+-------------------------+
+| hour_of_day  | vehicles_on_shift  | on_order_pct  | avg_kmh_on_order  | positions_outside_city  |
++--------------+--------------------+---------------+-------------------+-------------------------+
+| 0            | 73                 | 33.2          | 34.8              | 46                      |
+| 1            | 53                 | 31.5          | 43.0              | 108                     |
+| 2            | 41                 | 28.7          | 36.8              | 60                      |
+| 3            | 40                 | 47.7          | 39.7              | 78                      |
+| 4            | 44                 | 50.1          | 40.6              | 39                      |
+| 5            | 84                 | 51.0          | 39.6              | 0                       |
+| 6            | 157                | 55.6          | 34.5              | 26                      |
+| 7            | 215                | 59.5          | 25.5              | 32                      |
+| 8            | 267                | 55.5          | 24.1              | 18                      |
+| 9            | 295                | 50.9          | 26.0              | 28                      |
+| 10           | 256                | 50.2          | 26.1              | 33                      |
++--------------+--------------------+---------------+-------------------+-------------------------+
+11 rows selected (24.127 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> Closing: 0: jdbc:hive2://localhost:10000
+[wall-clock time of the command: 228 s]

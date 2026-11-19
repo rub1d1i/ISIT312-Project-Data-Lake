@@ -1,0 +1,183 @@
+bigdata@datalake:~$ beeline --color=false -u jdbc:hive2://localhost:10000 -n bigdata -f project/pipelines/hive/03_dw_tables.hql
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> -- ANALYTICS zone: the dimensional warehouse (fact constellation: five facts
+0: jdbc:hive2://localhost:10000> -- sharing dimensions) as Hive external tables over the Parquet written by
+0: jdbc:hive2://localhost:10000> -- pipelines/spark/30_dw_build.scala.
+0: jdbc:hive2://localhost:10000> -- Fact tables are partitioned by branch and month: a query for one branch and
+0: jdbc:hive2://localhost:10000> -- one month reads one folder (partition pruning).
+0: jdbc:hive2://localhost:10000> -- Run: beeline -u jdbc:hive2://localhost:10000 -n bigdata -f 03_dw_tables.hql
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> CREATE DATABASE IF NOT EXISTS dw COMMENT 'analytics zone - dimensional warehouse' LOCATION '/lake/analytics/_hive';
+No rows affected (0.04 seconds)
+0: jdbc:hive2://localhost:10000> USE dw;
+No rows affected (0.005 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_branch;
+No rows affected (0.005 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_branch (branch_key INT, branch_code STRING, city_label STRING, branch_role STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_branch';
+No rows affected (0.017 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_date;
+No rows affected (0.005 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_date (date_key INT, full_date DATE, day_of_month INT, day_name STRING, day_of_week INT, is_weekend BOOLEAN,
+. . . . . . . . . . . . . . . .>   week_of_year INT, month_no INT, month_name STRING, year_month STRING, quarter_no INT, year_no INT)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_date';
+No rows affected (0.013 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_time_of_day;
+No rows affected (0.005 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_time_of_day (hour_key INT, day_part STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_time_of_day';
+No rows affected (0.011 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_zone;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_zone (zone_key INT, zone_code STRING, zone_type STRING, branch_key INT, city_label STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_zone';
+No rows affected (0.011 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_service;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_service (service_key INT, service_name STRING, service_line STRING, vehicle_class STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_service';
+No rows affected (0.01 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_channel;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_channel (channel_key INT, channel_name STRING, channel_group STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_channel';
+No rows affected (0.012 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_outcome;
+No rows affected (0.005 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_outcome (outcome_key INT, outcome_name STRING, outcome_group STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_outcome';
+No rows affected (0.011 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_payment_method;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_payment_method (payment_method_key INT, payment_method STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_payment_method';
+No rows affected (0.012 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_client;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_client (client_key INT, branch_key INT, cod_cl BIGINT, client_type STRING, corp_account_id INT, industry STRING, app_user BOOLEAN)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_client';
+No rows affected (0.01 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_driver;
+No rows affected (0.003 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_driver (driver_key INT, branch_key INT, cod_drv INT, employment_type STRING, vehicle_class STRING, hire_year INT, car_id INT)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_driver';
+No rows affected (0.01 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_operator;
+No rows affected (0.005 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_operator (operator_key INT, branch_key INT, op_id INT, operator_role STRING, operator_kind STRING, shift STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_operator';
+No rows affected (0.011 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS fact_orders;
+No rows affected (0.009 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE fact_orders (
+. . . . . . . . . . . . . . . .>   date_key INT, hour_key INT, branch_key INT, pickup_zone_key INT, dropoff_zone_key INT, service_key INT, channel_key INT,
+. . . . . . . . . . . . . . . .>   client_key INT, driver_key INT, outcome_key INT, payment_method_key INT, order_id BIGINT,
+. . . . . . . . . . . . . . . .>   order_count INT, fare_amount DECIMAL(12,2), vat_amount DECIMAL(12,2), commission_amount DECIMAL(12,2), driver_payout DECIMAL(12,2),
+. . . . . . . . . . . . . . . .>   company_revenue DECIMAL(12,2), quoted_amount DECIMAL(12,2), distance_km DOUBLE,
+. . . . . . . . . . . . . . . .>   assign_minutes DOUBLE, arrival_minutes DOUBLE, wait_minutes DOUBLE, trip_minutes DOUBLE, late_count INT, preorder_count INT
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> PARTITIONED BY (branch_code STRING, order_month STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/fact_orders';
+No rows affected (0.009 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE fact_orders;
+No rows affected (0.034 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS fact_fleet_activity;
+No rows affected (0.003 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE fact_fleet_activity (
+. . . . . . . . . . . . . . . .>   date_key INT, hour_key INT, branch_key INT, driver_key INT, zone_key INT, positions INT, minutes_free INT, minutes_on_order INT,
+. . . . . . . . . . . . . . . .>   minutes_other INT, avg_speed_on_order_kmh DOUBLE, positions_outside_city INT
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/fact_fleet_activity';
+No rows affected (0.009 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS fact_calls;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE fact_calls (
+. . . . . . . . . . . . . . . .>   date_key INT, hour_key INT, branch_key INT, operator_key INT, call_type STRING, direction STRING, disposition STRING,
+. . . . . . . . . . . . . . . .>   recording_uid STRING, order_id BIGINT, call_count INT, answered_count INT, talk_seconds INT, queue_wait_seconds INT, duration_seconds INT
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> PARTITIONED BY (branch_code STRING, call_month STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/fact_calls';
+No rows affected (0.008 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE fact_calls;
+No rows affected (0.038 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dim_ledger_item;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dim_ledger_item (ledger_item_key INT, account STRING, item STRING, item_group STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/dim_ledger_item';
+No rows affected (0.015 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS fact_market_hourly;
+No rows affected (0.011 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE fact_market_hourly (
+. . . . . . . . . . . . . . . .>   date_key INT, hour_key INT, branch_key INT, competitor_price_3km DOUBLE, competitor_price_8km DOUBLE, competitor_price_20km DOUBLE,
+. . . . . . . . . . . . . . . .>   competitor_surge DOUBLE, traffic_index DOUBLE
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/fact_market_hourly';
+No rows affected (0.017 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS fact_ledger;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE fact_ledger (date_key INT, branch_key INT, ledger_item_key INT, amount DECIMAL(14,2))
+. . . . . . . . . . . . . . . .> STORED AS PARQUET LOCATION '/lake/analytics/dw/fact_ledger';
+No rows affected (0.009 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> SHOW TABLES;
++----------------------+
+|       tab_name       |
++----------------------+
+| dim_branch           |
+| dim_channel          |
+| dim_client           |
+| dim_date             |
+| dim_driver           |
+| dim_ledger_item      |
+| dim_operator         |
+| dim_outcome          |
+| dim_payment_method   |
+| dim_service          |
+| dim_time_of_day      |
+| dim_zone             |
+| fact_calls           |
+| fact_fleet_activity  |
+| fact_ledger          |
+| fact_market_hourly   |
+| fact_orders          |
++----------------------+
+17 rows selected (0.026 seconds)
+0: jdbc:hive2://localhost:10000> SHOW PARTITIONS fact_orders;
++------------------------------------+
+|             partition              |
++------------------------------------+
+| branch_code=A/order_month=2026-10  |
+| branch_code=A/order_month=2026-11  |
+| branch_code=B/order_month=2026-10  |
+| branch_code=B/order_month=2026-11  |
++------------------------------------+
+4 rows selected (0.035 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> Closing: 0: jdbc:hive2://localhost:10000
+[wall-clock time of the command: 2 s]

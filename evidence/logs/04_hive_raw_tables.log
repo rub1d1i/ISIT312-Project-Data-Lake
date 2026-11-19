@@ -1,0 +1,343 @@
+bigdata@datalake:~$ beeline --color=false -u jdbc:hive2://localhost:10000 -n bigdata -f project/pipelines/hive/01_raw_tables.hql
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> -- RAW zone: Hive external tables over the files exactly as they landed.
+0: jdbc:hive2://localhost:10000> -- Schema on read: the files are not converted or moved; dropping a table
+0: jdbc:hive2://localhost:10000> -- here never deletes data. Every dispatch column is declared STRING because
+0: jdbc:hive2://localhost:10000> -- the export mixes types in the same column (see podezd).
+0: jdbc:hive2://localhost:10000> -- Run: beeline -u jdbc:hive2://localhost:10000 -n bigdata -f 01_raw_tables.hql
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> CREATE DATABASE IF NOT EXISTS lake_raw COMMENT 'raw zone - source format, schema on read' LOCATION '/lake/raw/_hive';
+No rows affected (0.054 seconds)
+0: jdbc:hive2://localhost:10000> USE lake_raw;
+No rows affected (0.009 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- dispatch system: order archive, 95 columns as exported by the branch database
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS orders;
+No rows affected (0.03 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE orders (
+. . . . . . . . . . . . . . . .>   cod_cl             STRING,
+. . . . . . . . . . . . . . . .>   op_prn             STRING,
+. . . . . . . . . . . . . . . .>   op_otp             STRING,
+. . . . . . . . . . . . . . . .>   cod_drv            STRING,
+. . . . . . . . . . . . . . . .>   cod_car            STRING,
+. . . . . . . . . . . . . . . .>   eaddr_frm          STRING,
+. . . . . . . . . . . . . . . .>   eaddr_to           STRING,
+. . . . . . . . . . . . . . . .>   oaddr_frm          STRING,
+. . . . . . . . . . . . . . . .>   oaddr_to           STRING,
+. . . . . . . . . . . . . . . .>   pay                STRING,
+. . . . . . . . . . . . . . . .>   d_pzakaz           STRING,
+. . . . . . . . . . . . . . . .>   d_vzakaz           STRING,
+. . . . . . . . . . . . . . . .>   d_sparka           STRING,
+. . . . . . . . . . . . . . . .>   d_vprib            STRING,
+. . . . . . . . . . . . . . . .>   d_vipol            STRING,
+. . . . . . . . . . . . . . . .>   d_busy             STRING,
+. . . . . . . . . . . . . . . .>   d_noansw           STRING,
+. . . . . . . . . . . . . . . .>   status             STRING,
+. . . . . . . . . . . . . . . .>   cod_route          STRING,
+. . . . . . . . . . . . . . . .>   zakaz_info         STRING,
+. . . . . . . . . . . . . . . .>   d_podzvon          STRING,
+. . . . . . . . . . . . . . . .>   eaddr_1            STRING,
+. . . . . . . . . . . . . . . .>   eaddr_2            STRING,
+. . . . . . . . . . . . . . . .>   eaddr_3            STRING,
+. . . . . . . . . . . . . . . .>   eaddr_4            STRING,
+. . . . . . . . . . . . . . . .>   eaddr_5            STRING,
+. . . . . . . . . . . . . . . .>   eaddr_6            STRING,
+. . . . . . . . . . . . . . . .>   eaddr_7            STRING,
+. . . . . . . . . . . . . . . .>   eaddr_8            STRING,
+. . . . . . . . . . . . . . . .>   beznal             STRING,
+. . . . . . . . . . . . . . . .>   waite_pay          STRING,
+. . . . . . . . . . . . . . . .>   channel            STRING,
+. . . . . . . . . . . . . . . .>   cid_tel            STRING,
+. . . . . . . . . . . . . . . .>   cart               STRING,
+. . . . . . . . . . . . . . . .>   cod_akc            STRING,
+. . . . . . . . . . . . . . . .>   wavf               STRING,
+. . . . . . . . . . . . . . . .>   plan_id            STRING,
+. . . . . . . . . . . . . . . .>   order_id           STRING,
+. . . . . . . . . . . . . . . .>   tender_num         STRING,
+. . . . . . . . . . . . . . . .>   podezd             STRING,
+. . . . . . . . . . . . . . . .>   reazon             STRING,
+. . . . . . . . . . . . . . . .>   cnt_retr           STRING,
+. . . . . . . . . . . . . . . .>   d_vzyal            STRING,
+. . . . . . . . . . . . . . . .>   ds_status          STRING,
+. . . . . . . . . . . . . . . .>   notify             STRING,
+. . . . . . . . . . . . . . . .>   cmnt               STRING,
+. . . . . . . . . . . . . . . .>   distance           STRING,
+. . . . . . . . . . . . . . . .>   d_inform           STRING,
+. . . . . . . . . . . . . . . .>   drv_podacha        STRING,
+. . . . . . . . . . . . . . . .>   podacha            STRING,
+. . . . . . . . . . . . . . . .>   d_startwait        STRING,
+. . . . . . . . . . . . . . . .>   d_cl_ack           STRING,
+. . . . . . . . . . . . . . . .>   cnt_cl_ack         STRING,
+. . . . . . . . . . . . . . . .>   d_drv_podacha      STRING,
+. . . . . . . . . . . . . . . .>   d_call_try         STRING,
+. . . . . . . . . . . . . . . .>   d_opazd            STRING,
+. . . . . . . . . . . . . . . .>   order_limit_mask   STRING,
+. . . . . . . . . . . . . . . .>   do_propose         STRING,
+. . . . . . . . . . . . . . . .>   drv_near           STRING,
+. . . . . . . . . . . . . . . .>   bonus              STRING,
+. . . . . . . . . . . . . . . .>   rezerv_cod_drv     STRING,
+. . . . . . . . . . . . . . . .>   mejgorod           STRING,
+. . . . . . . . . . . . . . . .>   d_paysms           STRING,
+. . . . . . . . . . . . . . . .>   s_channel          STRING,
+. . . . . . . . . . . . . . . .>   d_wait             STRING,
+. . . . . . . . . . . . . . . .>   c_wait             STRING,
+. . . . . . . . . . . . . . . .>   d_pochas           STRING,
+. . . . . . . . . . . . . . . .>   pochas             STRING,
+. . . . . . . . . . . . . . . .>   s_pay              STRING,
+. . . . . . . . . . . . . . . .>   zakaz_naryad       STRING,
+. . . . . . . . . . . . . . . .>   netoch_addr_id     STRING,
+. . . . . . . . . . . . . . . .>   drv_mejgorod       STRING,
+. . . . . . . . . . . . . . . .>   drv_wait_min       STRING,
+. . . . . . . . . . . . . . . .>   is_taxometr        STRING,
+. . . . . . . . . . . . . . . .>   show_tel           STRING,
+. . . . . . . . . . . . . . . .>   aa_ord             STRING,
+. . . . . . . . . . . . . . . .>   operator_info      STRING,
+. . . . . . . . . . . . . . . .>   wtx_a_id           STRING,
+. . . . . . . . . . . . . . . .>   wtx_p_id           STRING,
+. . . . . . . . . . . . . . . .>   wtx_dready         STRING,
+. . . . . . . . . . . . . . . .>   stavka             STRING,
+. . . . . . . . . . . . . . . .>   free_bonus         STRING,
+. . . . . . . . . . . . . . . .>   show_in_history    STRING,
+. . . . . . . . . . . . . . . .>   ord_prio           STRING,
+. . . . . . . . . . . . . . . .>   contact_phone      STRING,
+. . . . . . . . . . . . . . . .>   adapted_id         STRING,
+. . . . . . . . . . . . . . . .>   eaddr_info_id      STRING,
+. . . . . . . . . . . . . . . .>   eaddr_coords       STRING,
+. . . . . . . . . . . . . . . .>   eaddr_lat          STRING,
+. . . . . . . . . . . . . . . .>   eaddr_lon          STRING,
+. . . . . . . . . . . . . . . .>   chat_client        STRING,
+. . . . . . . . . . . . . . . .>   d_torg             STRING,
+. . . . . . . . . . . . . . . .>   card_payment       STRING,
+. . . . . . . . . . . . . . . .>   eaddr_lat_last     STRING,
+. . . . . . . . . . . . . . . .>   eaddr_lon_last     STRING
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> PARTITIONED BY (branch STRING, dt STRING)
+. . . . . . . . . . . . . . . .> ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/dispatch/orders'
+. . . . . . . . . . . . . . . .> TBLPROPERTIES ('skip.header.line.count'='1');
+No rows affected (0.165 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE orders;
+No rows affected (0.389 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- dispatch system: vehicle positions, one-off back-fill of the GPS table up to the cut-over to streaming
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS gps;
+No rows affected (0.007 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE gps (
+. . . . . . . . . . . . . . . .>   id BIGINT, cod_drv INT, d_receive STRING, lat DOUBLE, lon DOUBLE, sector_id INT,
+. . . . . . . . . . . . . . . .>   speed DOUBLE, track DOUBLE, fix INT, quality INT, state_gps_id INT, id_terminal BIGINT
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> PARTITIONED BY (branch STRING, dt STRING)
+. . . . . . . . . . . . . . . .> ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/dispatch/gps'
+. . . . . . . . . . . . . . . .> TBLPROPERTIES ('skip.header.line.count'='1');
+No rows affected (0.015 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE gps;
+No rows affected (0.038 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- vehicle positions landed by the streaming job since the cut-over (Parquet, many small files)
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS gps_stream;
+No rows affected (0.007 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE gps_stream (
+. . . . . . . . . . . . . . . .>   id BIGINT, cod_drv INT, ts STRING, lat DOUBLE, lon DOUBLE, speed DOUBLE, track DOUBLE, fix INT, quality INT, state INT, terminal BIGINT,
+. . . . . . . . . . . . . . . .>   kafka_ts TIMESTAMP, `partition` INT, `offset` BIGINT, event_ts TIMESTAMP
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> PARTITIONED BY (branch STRING, dt STRING)
+. . . . . . . . . . . . . . . .> STORED AS PARQUET
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/stream/gps';
+No rows affected (0.028 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE gps_stream;
+No rows affected (0.039 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- PBX call detail records
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS cdr;
+No rows affected (0.007 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE cdr (
+. . . . . . . . . . . . . . . .>   calldate STRING, uniqueid STRING, branch_id INT, src_hash STRING, dst STRING, direction STRING, call_type STRING,
+. . . . . . . . . . . . . . . .>   op_id INT, duration INT, billsec INT, disposition STRING, queue_wait INT, recordingfile STRING, order_id BIGINT
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> PARTITIONED BY (branch STRING, dt STRING)
+. . . . . . . . . . . . . . . .> ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/pbx/cdr'
+. . . . . . . . . . . . . . . .> TBLPROPERTIES ('skip.header.line.count'='1');
+No rows affected (0.015 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE cdr;
+No rows affected (0.251 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- billing: payments and driver settlements
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS payments;
+No rows affected (0.015 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE payments (
+. . . . . . . . . . . . . . . .>   payment_id BIGINT, branch_id INT, order_id BIGINT, paid_at STRING, amount DOUBLE, currency STRING, method STRING,
+. . . . . . . . . . . . . . . .>   cod_drv INT, commission_amount DOUBLE, driver_payout DOUBLE, state STRING
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> PARTITIONED BY (branch STRING, dt STRING)
+. . . . . . . . . . . . . . . .> ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/billing/payments'
+. . . . . . . . . . . . . . . .> TBLPROPERTIES ('skip.header.line.count'='1');
+No rows affected (0.015 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE payments;
+No rows affected (0.157 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- accounting package export: Windows-1251, ';' separated, dd.MM.yyyy dates, decimal comma.
+0: jdbc:hive2://localhost:10000> -- The SerDe decodes the code page; dates and amounts stay text until curation.
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS gl_export;
+No rows affected (0.006 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE gl_export (
+. . . . . . . . . . . . . . . .>   doc_date STRING, unit STRING, account STRING, item STRING, amount STRING, currency STRING, posting STRING
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'
+. . . . . . . . . . . . . . . .> WITH SERDEPROPERTIES ('field.delim'=';', 'serialization.encoding'='windows-1251')
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/finance/gl'
+. . . . . . . . . . . . . . . .> TBLPROPERTIES ('skip.header.line.count'='1');
+No rows affected (0.013 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- SMS gateway log
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS sms;
+No rows affected (0.006 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE sms (
+. . . . . . . . . . . . . . . .>   sms_id BIGINT, sent_at STRING, branch_id INT, cod_cl BIGINT, phone_hash STRING, template STRING, order_id BIGINT,
+. . . . . . . . . . . . . . . .>   delivery_status STRING, segments INT, cost_rub DOUBLE
+. . . . . . . . . . . . . . . .> )
+. . . . . . . . . . . . . . . .> PARTITIONED BY (dt STRING)
+. . . . . . . . . . . . . . . .> ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/messaging/sms'
+. . . . . . . . . . . . . . . .> TBLPROPERTIES ('skip.header.line.count'='1');
+No rows affected (0.012 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE sms;
+No rows affected (0.091 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- semi-structured sources: one JSON document per line, kept as a single string
+0: jdbc:hive2://localhost:10000> -- column and read with get_json_object() - no schema has to be agreed up front.
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS app_events;
+No rows affected (0.007 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE app_events (line STRING)
+. . . . . . . . . . . . . . . .> PARTITIONED BY (dt STRING)
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/app/events';
+No rows affected (0.011 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE app_events;
+No rows affected (0.042 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS chat_messages;
+No rows affected (0.006 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE chat_messages (line STRING)
+. . . . . . . . . . . . . . . .> PARTITIONED BY (dt STRING)
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/messaging/chat';
+No rows affected (0.009 seconds)
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE chat_messages;
+No rows affected (0.091 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS competitor_prices;
+No rows affected (0.005 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE competitor_prices (line STRING)
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/external/competitor_prices';
+No rows affected (0.01 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS dashcam_requests;
+No rows affected (0.004 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE dashcam_requests (line STRING)
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/video/catalog/dashcam_requests';
+No rows affected (0.011 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS traffic_index;
+No rows affected (0.005 seconds)
+0: jdbc:hive2://localhost:10000> CREATE EXTERNAL TABLE traffic_index (ts STRING, branch_id INT, traffic_index DOUBLE)
+. . . . . . . . . . . . . . . .> ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+. . . . . . . . . . . . . . . .> STORED AS TEXTFILE
+. . . . . . . . . . . . . . . .> LOCATION '/lake/raw/external/traffic'
+. . . . . . . . . . . . . . . .> TBLPROPERTIES ('skip.header.line.count'='1');
+No rows affected (0.01 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> SHOW TABLES;
++--------------------+
+|      tab_name      |
++--------------------+
+| app_events         |
+| cdr                |
+| chat_messages      |
+| competitor_prices  |
+| dashcam_requests   |
+| gl_export          |
+| gps                |
+| gps_stream         |
+| orders             |
+| payments           |
+| sms                |
+| traffic_index      |
++--------------------+
+12 rows selected (0.098 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- a first look through the raw tables: rows per source, straight from the landed files
+0: jdbc:hive2://localhost:10000> SELECT 'orders' AS source, COUNT(*) AS row_count FROM orders
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'gps (back-fill)', COUNT(*) FROM gps
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'gps (stream)', COUNT(*) FROM gps_stream
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'cdr', COUNT(*) FROM cdr
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'payments', COUNT(*) FROM payments
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'sms', COUNT(*) FROM sms
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'app_events', COUNT(*) FROM app_events
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'gl_export', COUNT(*) FROM gl_export;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++------------------+----------------+
+|    _u1.source    | _u1.row_count  |
++------------------+----------------+
+| gps (back-fill)  | 80466          |
+| gps (stream)     | 58984          |
+| app_events       | 39660          |
+| payments         | 167570         |
+| gl_export        | 412            |
+| orders           | 221155         |
+| cdr              | 660377         |
+| sms              | 210859         |
++------------------+----------------+
+8 rows selected (108.24 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- the accounting export is readable although it arrived in Windows-1251 with ';' separators
+0: jdbc:hive2://localhost:10000> SELECT doc_date, unit, account, item, amount FROM gl_export LIMIT 4;
++-------------+-----------+----------+-----------------------------------+--------------+
+|  doc_date   |   unit    | account  |               item                |    amount    |
++-------------+-----------+----------+-----------------------------------+--------------+
+| 01.10.2026  | Филиал A  | 90.01    | Выручка: грузовые перевозки       | 434238,60    |
+| 01.10.2026  | Филиал A  | 90.01    | Выручка: пассажирские перевозки   | 2237213,00   |
+| 01.10.2026  | Филиал A  | 90.01    | Выручка: эвакуация и спецтехника  | 90853,20     |
+| 01.10.2026  | Филиал A  | 20.01    | Выплаты водителям-подрядчикам     | -1828697,40  |
++-------------+-----------+----------+-----------------------------------+--------------+
+4 rows selected (0.085 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> -- schema on read for JSON: fields are picked out of the document at query time
+0: jdbc:hive2://localhost:10000> SELECT get_json_object(line, '$.event') AS event, get_json_object(line, '$.platform') AS platform, COUNT(*) AS events
+. . . . . . . . . . . . . . . .> FROM app_events WHERE dt = '2026-11-16'
+. . . . . . . . . . . . . . . .> GROUP BY get_json_object(line, '$.event'), get_json_object(line, '$.platform')
+. . . . . . . . . . . . . . . .> ORDER BY events DESC LIMIT 6;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++-----------------+-----------+---------+
+|      event      | platform  | events  |
++-----------------+-----------+---------+
+| price_quote     | android   | 1051    |
+| app_open        | android   | 774     |
+| address_search  | android   | 774     |
+| app_background  | android   | 566     |
+| price_quote     | ios       | 523     |
+| app_open        | ios       | 389     |
++-----------------+-----------+---------+
+6 rows selected (24.423 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> Closing: 0: jdbc:hive2://localhost:10000
+[wall-clock time of the command: 136 s]

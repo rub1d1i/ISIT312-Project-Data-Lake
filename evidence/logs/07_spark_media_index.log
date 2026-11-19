@@ -1,0 +1,49 @@
+bigdata@datalake:~$ spark-shell --master yarn --conf spark.ui.showConsoleProgress=false -i project/pipelines/spark/22_media_index.scala
+26/11/19 18:04:05 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = yarn, app id = application_1795110592923_0015).
+Spark session available as 'spark'.
+recordings as landed :   235 files     172.6 MB
+recordings packed    :     1 file      172.6 MB   (packed in 0.9 s)
+26/11/19 18:04:17 WARN util.Utils: Truncated the string representation of a plan since it was too large. This behavior can be adjusted by setting 'spark.debug.maxToStringFields' in SparkEnv.conf.
+audio index: recordings joined to the call log and the order archive
++--------------+----------+--------------+---------------+----------+------------+-----+--------+---------+
+|recording_uid |duration_s|sample_rate_hz|bits_per_sample|size_bytes|offset_bytes|op_id|order_id|outcome  |
++--------------+----------+--------------+---------------+----------+------------+-----+--------+---------+
+|0082cfc6a39cc2|42.0      |8000          |16             |672044    |87          |2741 |76833592|COMPLETED|
+|017fa81baa515c|48.0      |8000          |16             |768044    |672162      |2741 |76833717|COMPLETED|
+|030379e809f5f6|20.0      |8000          |16             |320044    |1440257     |2741 |76833444|COMPLETED|
+|0342ea2f7eb5dd|76.0      |8000          |16             |1216044   |1760352     |2741 |76833712|COMPLETED|
+|03486e5f50561e|62.0      |8000          |16             |992044    |2976447     |2275 |76833598|COMPLETED|
+|045e0569c22636|22.0      |8000          |16             |352044    |3968542     |2741 |76833630|COMPLETED|
+|04ee332dae54c5|21.0      |8000          |16             |336044    |4320637     |2275 |76833679|COMPLETED|
+|066858d2c801f4|21.0      |8000          |16             |336044    |4656732     |2741 |76833534|COMPLETED|
++--------------+----------+--------------+---------------+----------+------------+-----+--------+---------+
+only showing top 8 rows
+
++----------+-------+-----+-----------+----------+-----------------------+
+|recordings|minutes|MB   |avg_seconds|index_rows|rows_linked_to_an_order|
++----------+-------+-----+-----------+----------+-----------------------+
+|235       |179.8  |172.6|45.9       |240       |240                    |
++----------+-------+-----+-----------+----------+-----------------------+
+
+direct read of recording d78d115bdebf13 (order 76833758) at offset 142050687: file d78d115bdebf13.wav, 1520044 bytes, header RIFF, expected 1520044 bytes, 9 ms
+video index: files in the raw zone with their HDFS block counts
++----------+---------------------------------+-----+-----------+------------------+----------------+--------+
+|video_type|file_name                        |MB   |hdfs_blocks|location          |request_reason  |order_id|
++----------+---------------------------------+-----+-----------+------------------+----------------+--------+
+|CCTV      |cam03_20261116T080000.mp4        |148.8|2          |call-centre hall 1|null            |null    |
+|DASHCAM   |dc0000247_car0009.mp4            |7.5  |1          |null              |CLIENT_COMPLAINT|76833837|
+|DASHCAM   |dc0000246_car0012.mp4            |7.5  |1          |null              |CLIENT_COMPLAINT|76833868|
+|DASHCAM   |dc0000244_car0012.mp4            |7.5  |1          |null              |ROAD_ACCIDENT   |76833751|
+|DASHCAM   |dc0000245_car0020.mp4            |7.5  |1          |null              |LOST_ITEM       |76833852|
+|CCTV      |cam01_20261116T080000_preview.mp4|1.6  |1          |entrance          |null            |null    |
+|CCTV      |cam07_20261116T081000_preview.mp4|1.6  |1          |server room       |null            |null    |
+|CCTV      |cam05_20261116T080000_preview.mp4|1.6  |1          |dispatch room     |null            |null    |
+|CCTV      |cam11_20261116T081000_preview.mp4|1.6  |1          |parking gate      |null            |null    |
+|CCTV      |cam12_20261116T082000_preview.mp4|1.6  |1          |parking north     |null            |null    |
++----------+---------------------------------+-----+-----------+------------------+----------------+--------+
+
+[wall-clock time of the command: 17 s]

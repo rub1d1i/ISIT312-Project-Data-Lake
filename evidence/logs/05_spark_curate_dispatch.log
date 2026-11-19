@@ -1,0 +1,37 @@
+bigdata@datalake:~$ spark-shell --master yarn --conf spark.ui.showConsoleProgress=false -i project/pipelines/spark/20_curate_dispatch.scala
+26/11/19 18:02:46 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://datalake:4040
+Spark context available as 'sc' (master = yarn, app id = application_1795110592923_0013).
+Spark session available as 'spark'.
+reference tables promoted: 13
+26/11/19 18:03:03 WARN util.Utils: Truncated the string representation of a plan since it was too large. This behavior can be adjusted by setting 'spark.debug.maxToStringFields' in SparkEnv.conf.
+ORDERS  raw rows: 221155   exact copies removed: 610   older versions removed: 0   curated rows: 220545
+orders: data-quality summary per branch
++-----------+------+----------+-------------+-------------+-------------+-----------------+--------------+---------+
+|branch_code|orders|clock_skew|zero_distance|price_changed|private_house|entrance_unparsed|with_recording|vat_split|
++-----------+------+----------+-------------+-------------+-------------+-----------------+--------------+---------+
+|A          |142094|241       |530          |4041         |4348         |4585             |94135         |8456     |
+|B          |78451 |107       |273          |2072         |2402         |2415             |52125         |4703     |
++-----------+------+----------+-------------+-------------+-------------+-----------------+--------------+---------+
+
+GPS  back-fill rows: 80466   rows landed by the stream: 58984 (in 36 small files)   after merge and de-duplication: 138476
+gps: all positions per branch and vehicle state, before the off-shift ones are held back
++------+-----+-----+-----+----+----+
+|branch|0    |1    |2    |3   |6   |
++------+-----+-----+-----+----+----+
+|A     |23937|27521|29840|1219|270 |
+|B     |5590 |38246|11853|null|null|
++------+-----+-----+-----+----+----+
+
+GPS  curated rows (on-shift positions only): 108949   off-shift positions kept in raw only: 29527   curated files: 2
+gps: data-quality summary per branch
++-----------+---------+--------+------+-------------+----------------------+------------+------------+-------+
+|branch_code|positions|vehicles|no_fix|speed_missing|in_multi_point_minutes|outside_city|speed_glitch|max_kmh|
++-----------+---------+--------+------+-------------+----------------------+------------+------------+-------+
+|A          |58850    |408     |33    |311          |6547                  |468         |2           |141.3  |
+|B          |50099    |282     |132   |445          |5913                  |0           |246         |149.7  |
++-----------+---------+--------+------+-------------+----------------------+------------+------------+-------+
+
+[wall-clock time of the command: 32 s]

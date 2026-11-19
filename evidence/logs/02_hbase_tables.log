@@ -1,0 +1,22 @@
+bigdata@datalake:~$ bash project/pipelines/hbase/01_tables.sh
+0 row(s) in 0.0680 seconds
+0 row(s) in 0.0590 seconds
+0 row(s) in 1.3000 seconds
+Hbase::Table - fleet:driver_position
+0 row(s) in 1.2870 seconds
+Hbase::Table - media:recording
+TABLE                                                                           
+fleet:driver_position                                                           
+media:recording                                                                 
+2 row(s) in 0.0610 seconds
+fleet:driver_position
+media:recording
+Table fleet:driver_position is ENABLED                                          
+fleet:driver_position                                                           
+COLUMN FAMILIES DESCRIPTION                                                     
+{NAME => 'p', BLOOMFILTER => 'ROW', VERSIONS => '5', IN_MEMORY => 'false', KEEP_
+DELETED_CELLS => 'FALSE', DATA_BLOCK_ENCODING => 'NONE', TTL => 'FOREVER', COMPR
+ESSION => 'NONE', MIN_VERSIONS => '0', BLOCKCACHE => 'true', BLOCKSIZE => '65536
+', REPLICATION_SCOPE => '0'}                                                    
+1 row(s) in 0.0330 seconds
+[wall-clock time of the command: 18 s]
