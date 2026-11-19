@@ -1,0 +1,21 @@
+bigdata@datalake:~$ bash project/pipelines/stream/run_restart_test.sh
+== 1. separate topic and folders
+WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.
+Created topic gps.restart_test.
+== 2. replay 08:00-09:00 in the background (one recorded minute every two seconds)
+== 3. first run of the job: 20 s of streaming, stopped while the replay is still sending
+raw_landing      micro-batches with data:   2   positions:   4000   micro-batch time ms  min  1899  median  2934  max  2934
+landing folder holds 4000 rows, 4000 distinct positions
+-- offsets recorded in the checkpoint of the landing query (last batch)
+{"gps.restart_test":{"2":1304,"1":1432,"0":1264}}replayed 24483 positions from 08:00 to 09:00, held back: {'B': 0}
+== 4. second run with the same checkpoints: continues from those offsets
+raw_landing      micro-batches with data:   2   positions:  20483   micro-batch time ms  min  1115  median  2482  max  2482
+landing folder holds 24483 rows, 24483 distinct positions
+== 5. positions sent to the topic (end offsets) against rows landed
+gps.restart_test:0:7419
+gps.restart_test:1:8424
+gps.restart_test:2:8640
+positions in the topic: 24483
+-- consumer groups (Structured Streaming does not commit offsets to them)
+3 temporary spark-kafka-source groups
+[wall-clock time of the command: 196 s]
