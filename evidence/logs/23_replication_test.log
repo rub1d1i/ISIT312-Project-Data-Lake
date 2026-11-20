@@ -1,0 +1,43 @@
+bigdata@datalake:~$ bash project/pipelines/experiments/e7_replication.sh
+== 1. three more DataNode processes on this machine
+live DataNodes: 4
+Name: 127.0.0.1:54010 (localhost)
+Name: 127.0.0.1:52010 (localhost)
+Name: 127.0.0.1:53010 (localhost)
+Name: 127.0.0.1:50010 (localhost)
+
+== 2. one day of packed recordings stored with three replicas
+-rw-r--r--   3 bigdata supergroup  172582392 2026-11-20 12:05 /lake/tmp/replication_test/recordings.seq
+md5 of the file: 557c41ac31b9654b972a4eb59f4cd08e
+0. blk_1073745285 len=134217728 repl=3 [127.0.0.1:50010, 127.0.0.1:52010, 127.0.0.1:53010]
+1. blk_1073745286 len=38364664 repl=3 [127.0.0.1:52010, 127.0.0.1:53010, 127.0.0.1:50010]
+ Total blocks (validated):	2 (avg. block size 86291196 B)
+ Minimally replicated blocks:	2 (100.0 %)
+ Under-replicated blocks:	0 (0.0 %)
+ Average block replication:	3.0
+ Missing replicas:		0 (0.0 %)
+ Number of data-nodes:		4
+The filesystem under path '/lake/tmp/replication_test/recordings.seq' is HEALTHY
+
+== 3. the DataNode on port 52010 holds a replica of the first block: stop it (12:05:40)
+file read again straight after the stop, md5: 557c41ac31b9654b972a4eb59f4cd08e  (same file)
+
+== 4. wait until the NameNode gives the node up and copies the blocks again
+(a DataNode is declared dead after 630 s without a heartbeat)
+declared dead after 613 s; live DataNodes: 3
+three replicas again after 879 s (12:20:22)
+0. blk_1073745285 len=134217728 repl=3 [127.0.0.1:50010, 127.0.0.1:53010, 127.0.0.1:54010]
+1. blk_1073745286 len=38364664 repl=3 [127.0.0.1:50010, 127.0.0.1:53010, 127.0.0.1:54010]
+ Total blocks (validated):	2 (avg. block size 86291196 B)
+ Minimally replicated blocks:	2 (100.0 %)
+ Under-replicated blocks:	0 (0.0 %)
+ Average block replication:	3.0
+ Missing replicas:		0 (0.0 %)
+ Number of data-nodes:		3
+The filesystem under path '/lake/tmp/replication_test/recordings.seq' is HEALTHY
+md5 after re-replication: 557c41ac31b9654b972a4eb59f4cd08e  (same file)
+
+== 5. clean up: test file removed, extra DataNodes stopped
+blocks of other files with a replica on an extra DataNode: 0
+extra DataNodes stopped
+[wall-clock time of the command: 915 s]
