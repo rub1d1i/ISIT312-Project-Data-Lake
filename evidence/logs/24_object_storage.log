@@ -1,0 +1,25 @@
+bigdata@datalake:~$ bash project/pipelines/experiments/e8_object_storage.sh
+== 1. raw orders, curated orders, packed recordings and their index copied from HDFS to the object store
+copied in 24 s
+raw/dispatch/orders                            HDFS   87967784   object store   87967784
+curated/orders                                 HDFS   17865910   object store   17865910
+curated/media/recordings_packed                HDFS  172582392   object store  172582392
+curated/media/audio_index                      HDFS      21241   object store      21241
+
+== 2. the same Spark job on YARN against both stores
+store            step                                           result                              seconds
+HDFS             report on the raw order export (CSV)           471 groups, 221253 orders               4.0
+HDFS             same report on the curated table (Parquet)     469 groups, 220547 orders               0.6
+HDFS             report written as Parquet and read back        471 rows                                3.2
+HDFS             one recording read by its byte offset          1520044 of 1520044 bytes, header RIFF     36 ms
+object storage   report on the raw order export (CSV)           471 groups, 221253 orders               2.6
+object storage   same report on the curated table (Parquet)     469 groups, 220547 orders               0.3
+object storage   report written as Parquet and read back        471 rows                                3.3
+object storage   one recording read by its byte offset          1520044 of 1520044 bytes, header RIFF     51 ms
+
+== 3. what the object store holds afterwards
+Parquet files written by the job: 16
+83.9 M  s3a://lake/raw
+181.6 M  s3a://lake/curated
+25.7 K  s3a://lake/tmp
+[wall-clock time of the command: 58 s]
