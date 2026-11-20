@@ -1,0 +1,122 @@
+bigdata@datalake:~$ beeline --color=false -u jdbc:hive2://localhost:10000 -n bigdata -f project/pipelines/hive/06_report_tables.hql
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+Connecting to jdbc:hive2://localhost:10000
+Connected to: Apache Hive (version 2.3.9)
+Driver: Hive JDBC (version 2.3.9)
+Transaction isolation: TRANSACTION_REPEATABLE_READ
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> -- Report tables for the dashboard (reporting layer on top of the warehouse).
+0: jdbc:hive2://localhost:10000> -- Small aggregated tables in the analytics zone, rebuilt by the nightly load,
+0: jdbc:hive2://localhost:10000> -- so that a dashboard tile reads a few dozen rows and not a fact table.
+0: jdbc:hive2://localhost:10000> --   rpt_monthly_revenue     from the warehouse (generated history of both branches)
+0: jdbc:hive2://localhost:10000> --   rpt_orders_hour, rpt_price_km, rpt_fleet_hour
+0: jdbc:hive2://localhost:10000> --                           from the REAL extract only (branch A, 16 Nov 2026)
+0: jdbc:hive2://localhost:10000> -- Run: beeline -u jdbc:hive2://localhost:10000 -n bigdata -f 06_report_tables.hql
+0: jdbc:hive2://localhost:10000> -- ---------------------------------------------------------------------------
+0: jdbc:hive2://localhost:10000> CREATE DATABASE IF NOT EXISTS reports LOCATION '/lake/analytics/reports';
+No rows affected (0.859 seconds)
+0: jdbc:hive2://localhost:10000> USE reports;
+No rows affected (0.078 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS rpt_monthly_revenue;
+No rows affected (0.036 seconds)
+0: jdbc:hive2://localhost:10000> CREATE TABLE rpt_monthly_revenue STORED AS PARQUET AS
+. . . . . . . . . . . . . . . .> SELECT b.city_label AS city, d.year_month, s.service_line,
+. . . . . . . . . . . . . . . .>        SUM(f.order_count) AS orders,
+. . . . . . . . . . . . . . . .>        SUM(IF(o.outcome_name = 'COMPLETED', 1, 0)) AS completed,
+. . . . . . . . . . . . . . . .>        SUM(IF(o.outcome_name LIKE 'CANCELLED%', 1, 0)) AS cancelled,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(f.fare_amount), 0) AS revenue_rub
+. . . . . . . . . . . . . . . .> FROM dw.fact_orders f
+. . . . . . . . . . . . . . . .> JOIN dw.dim_branch b  ON f.branch_key = b.branch_key
+. . . . . . . . . . . . . . . .> JOIN dw.dim_date d    ON f.date_key = d.date_key
+. . . . . . . . . . . . . . . .> JOIN dw.dim_service s ON f.service_key = s.service_key
+. . . . . . . . . . . . . . . .> JOIN dw.dim_outcome o ON f.outcome_key = o.outcome_key
+. . . . . . . . . . . . . . . .> GROUP BY b.city_label, d.year_month, s.service_line;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/share/hive/lib/log4j-slf4j-impl-2.6.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/share/hadoop/share/hadoop/common/lib/slf4j-log4j12-1.7.10.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.apache.logging.slf4j.Log4jLoggerFactory]
+2026-11-20 12:01:18	Starting to launch local task to process map join;	maximum memory = 954728448
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-11-20 12:01:19	Dump the side-table for tag: 1 with group count: 5 into file: file:/tmp/bigdata/89145f2e-0e50-4036-84f5-779c8ffbff49/hive_2026-11-20_12-01-16_144_4371502849775147521-1/-local-10008/HashTable-Stage-5/MapJoin-mapfile01--.hashtable
+2026-11-20 12:01:19	Uploaded 1 File to: file:/tmp/bigdata/89145f2e-0e50-4036-84f5-779c8ffbff49/hive_2026-11-20_12-01-16_144_4371502849775147521-1/-local-10008/HashTable-Stage-5/MapJoin-mapfile01--.hashtable (449 bytes)
+2026-11-20 12:01:19	Dump the side-table for tag: 1 with group count: 8 into file: file:/tmp/bigdata/89145f2e-0e50-4036-84f5-779c8ffbff49/hive_2026-11-20_12-01-16_144_4371502849775147521-1/-local-10008/HashTable-Stage-5/MapJoin-mapfile11--.hashtable
+2026-11-20 12:01:19	Uploaded 1 File to: file:/tmp/bigdata/89145f2e-0e50-4036-84f5-779c8ffbff49/hive_2026-11-20_12-01-16_144_4371502849775147521-1/-local-10008/HashTable-Stage-5/MapJoin-mapfile11--.hashtable (476 bytes)
+2026-11-20 12:01:19	Dump the side-table for tag: 1 with group count: 47 into file: file:/tmp/bigdata/89145f2e-0e50-4036-84f5-779c8ffbff49/hive_2026-11-20_12-01-16_144_4371502849775147521-1/-local-10008/HashTable-Stage-5/MapJoin-mapfile21--.hashtable
+2026-11-20 12:01:19	Uploaded 1 File to: file:/tmp/bigdata/89145f2e-0e50-4036-84f5-779c8ffbff49/hive_2026-11-20_12-01-16_144_4371502849775147521-1/-local-10008/HashTable-Stage-5/MapJoin-mapfile21--.hashtable (1725 bytes)
+2026-11-20 12:01:19	Dump the side-table for tag: 1 with group count: 2 into file: file:/tmp/bigdata/89145f2e-0e50-4036-84f5-779c8ffbff49/hive_2026-11-20_12-01-16_144_4371502849775147521-1/-local-10008/HashTable-Stage-5/MapJoin-mapfile31--.hashtable
+2026-11-20 12:01:19	Uploaded 1 File to: file:/tmp/bigdata/89145f2e-0e50-4036-84f5-779c8ffbff49/hive_2026-11-20_12-01-16_144_4371502849775147521-1/-local-10008/HashTable-Stage-5/MapJoin-mapfile31--.hashtable (312 bytes)
+2026-11-20 12:01:19	End of local task; Time Taken: 0.652 sec.
+No rows affected (16.924 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS rpt_orders_hour;
+No rows affected (0.096 seconds)
+0: jdbc:hive2://localhost:10000> CREATE TABLE rpt_orders_hour STORED AS PARQUET AS
+. . . . . . . . . . . . . . . .> SELECT LPAD(CAST(order_hour AS STRING), 2, '0') AS order_hour,
+. . . . . . . . . . . . . . . .>        CASE WHEN order_hour < 6 THEN '00-05' WHEN order_hour < 9 THEN '06-08' ELSE '09-10' END AS hours,
+. . . . . . . . . . . . . . . .>        CASE channel WHEN 'MOBILE_APP' THEN 'Mobile app' WHEN 'CALL_CENTRE' THEN 'Call centre' ELSE 'Other' END AS channel,
+. . . . . . . . . . . . . . . .>        CASE WHEN outcome = 'COMPLETED' THEN 'Completed' WHEN outcome LIKE 'CANCELLED%' THEN 'Cancelled' ELSE 'Other' END AS outcome,
+. . . . . . . . . . . . . . . .>        COUNT(*) AS orders,
+. . . . . . . . . . . . . . . .>        SUM(IF(is_late, 1, 0)) AS flagged_no_car_in_time
+. . . . . . . . . . . . . . . .> FROM lake_curated.orders
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND order_date = '2026-11-16'
+. . . . . . . . . . . . . . . .> GROUP BY LPAD(CAST(order_hour AS STRING), 2, '0'),
+. . . . . . . . . . . . . . . .>          CASE WHEN order_hour < 6 THEN '00-05' WHEN order_hour < 9 THEN '06-08' ELSE '09-10' END,
+. . . . . . . . . . . . . . . .>          CASE channel WHEN 'MOBILE_APP' THEN 'Mobile app' WHEN 'CALL_CENTRE' THEN 'Call centre' ELSE 'Other' END,
+. . . . . . . . . . . . . . . .>          CASE WHEN outcome = 'COMPLETED' THEN 'Completed' WHEN outcome LIKE 'CANCELLED%' THEN 'Cancelled' ELSE 'Other' END;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+No rows affected (12.756 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS rpt_price_km;
+No rows affected (0.099 seconds)
+0: jdbc:hive2://localhost:10000> CREATE TABLE rpt_price_km STORED AS PARQUET AS
+. . . . . . . . . . . . . . . .> SELECT trip_length, period, COUNT(*) AS trips,
+. . . . . . . . . . . . . . . .>        ROUND(percentile_approx(CAST(pay AS DOUBLE) / distance_km, 0.5), 1) AS median_rub_per_km
+. . . . . . . . . . . . . . . .> FROM (SELECT pay, distance_km,
+. . . . . . . . . . . . . . . .>              CASE WHEN distance_km <= 5 THEN '01-05 km' WHEN distance_km <= 10 THEN '05-10 km'
+. . . . . . . . . . . . . . . .>                   WHEN distance_km <= 20 THEN '10-20 km' ELSE '20+ km' END AS trip_length,
+. . . . . . . . . . . . . . . .>              CASE WHEN order_hour < 6 THEN 'Night 00-06' WHEN order_hour IN (7, 8) THEN 'Peak 07-09' END AS period
+. . . . . . . . . . . . . . . .>       FROM lake_curated.orders
+. . . . . . . . . . . . . . . .>       WHERE branch_code = 'A' AND order_date = '2026-11-16' AND cart = 1 AND outcome = 'COMPLETED' AND distance_km > 1) t
+. . . . . . . . . . . . . . . .> WHERE period IS NOT NULL
+. . . . . . . . . . . . . . . .> GROUP BY trip_length, period;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+No rows affected (13.294 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> DROP TABLE IF EXISTS rpt_fleet_hour;
+No rows affected (0.099 seconds)
+0: jdbc:hive2://localhost:10000> CREATE TABLE rpt_fleet_hour STORED AS PARQUET AS
+. . . . . . . . . . . . . . . .> SELECT LPAD(CAST(hour(received_ts) AS STRING), 2, '0') AS hour_of_day,
+. . . . . . . . . . . . . . . .>        COUNT(DISTINCT cod_drv) AS vehicles_on_shift,
+. . . . . . . . . . . . . . . .>        ROUND(SUM(IF(state_id = 2, 1, 0)) * 100.0 / COUNT(*), 1) AS on_order_pct
+. . . . . . . . . . . . . . . .> FROM lake_curated.gps_positions
+. . . . . . . . . . . . . . . .> WHERE branch_code = 'A' AND dt = '2026-11-16'
+. . . . . . . . . . . . . . . .> GROUP BY LPAD(CAST(hour(received_ts) AS STRING), 2, '0');
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+No rows affected (13.832 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> SELECT 'rpt_monthly_revenue' AS report_table, COUNT(*) AS row_count FROM rpt_monthly_revenue
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'rpt_orders_hour', COUNT(*) FROM rpt_orders_hour
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'rpt_price_km', COUNT(*) FROM rpt_price_km
+. . . . . . . . . . . . . . . .> UNION ALL SELECT 'rpt_fleet_hour', COUNT(*) FROM rpt_fleet_hour;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
++----------------------+----------------+
+|   _u1.report_table   | _u1.row_count  |
++----------------------+----------------+
+| rpt_monthly_revenue  | 12             |
+| rpt_orders_hour      | 66             |
+| rpt_fleet_hour       | 11             |
+| rpt_price_km         | 8              |
++----------------------+----------------+
+4 rows selected (59.628 seconds)
+0: jdbc:hive2://localhost:10000> 
+0: jdbc:hive2://localhost:10000> Closing: 0: jdbc:hive2://localhost:10000
+[wall-clock time of the command: 120 s]
